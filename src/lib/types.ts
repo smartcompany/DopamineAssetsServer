@@ -49,6 +49,26 @@ export type MarketSummaryDto = {
   marketStatus: string | null;
 };
 
+/** GET /api/feed/asset-detail 응답 */
+export type AssetDetailDto = {
+  symbol: string;
+  name: string;
+  assetClass: AssetClass;
+  commodityKind?: CommodityKind;
+  /** 섹터·대분류 */
+  sector: string | null;
+  industry: string | null;
+  marketCap: string | null;
+  exchange: string | null;
+  currency: string | null;
+  description: string | null;
+  website: string | null;
+  baseCurrency: string | null;
+  quoteCurrency: string | null;
+  dataSources: string[];
+  asOf: string;
+};
+
 export type FeedUniverseEntry = {
   symbol: string;
   name: string;

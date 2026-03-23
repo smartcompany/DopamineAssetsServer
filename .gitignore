@@ -33,6 +33,9 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# Firebase SA one-liner helper (local only)
+.firebase-service-account-oneline.json
+
 # vercel
 .vercel
 

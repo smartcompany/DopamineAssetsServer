@@ -18,6 +18,14 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+/** 인버스·선물(연동) ETN/ETF 등 급등락 랭킹에서 제외 */
+function isExcludedKrStockName(name: string): boolean {
+  const compact = name.replace(/\s+/g, "");
+  if (compact.includes("인버스")) return true;
+  if (compact.includes("선물")) return true;
+  return false;
+}
+
 async function fetchNaverHtml(url: string): Promise<string> {
   const response = await fetch(url, { headers: NAVER_HEADERS });
   if (!response.ok) {
@@ -34,6 +42,7 @@ function parseNaverSiseHtml(html: string, suffix: "KS" | "KQ"): RankedAssetDto[]
   while ((m = re.exec(html)) !== null) {
     const code = m[1];
     const name = m[2]!.trim().replace(/\s+/g, " ");
+    if (isExcludedKrStockName(name)) continue;
     const pct = Number.parseFloat(m[3]!);
     if (!Number.isFinite(pct)) continue;
     const priceChangePct = pct;

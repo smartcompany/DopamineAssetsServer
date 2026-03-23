@@ -1,4 +1,4 @@
-const YAHOO_HEADERS: HeadersInit = {
+export const YAHOO_HEADERS: HeadersInit = {
   "User-Agent":
     "Mozilla/5.0 (compatible; DopamineAssets/1.0; +https://github.com)",
 };
