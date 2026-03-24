@@ -10,6 +10,16 @@ export type DailyBar = {
   volume: number;
 };
 
+export type OhlcBar = {
+  /** Unix seconds (bar start) */
+  t: number;
+  o: number;
+  h: number;
+  l: number;
+  c: number;
+  v: number;
+};
+
 /**
  * Yahoo Finance v8 chart, interval=1d.
  * 직전 거래일 종가 대비 최근 종가(또는 당일 봉) 등락 계산에 쓰인다 (스펙 §2.1).
@@ -69,6 +79,107 @@ export async function fetchYahooDailyBars(
 
   if (out.length === 0) {
     throw new Error(`Yahoo: no valid daily bars for ${symbol}`);
+  }
+
+  return out;
+}
+
+type YahooQuoteRow = {
+  open?: (number | null)[];
+  high?: (number | null)[];
+  low?: (number | null)[];
+  close?: (number | null)[];
+  volume?: (number | null)[];
+};
+
+/**
+ * Yahoo v8 chart, interval=1d — OHLCV for candlestick UI.
+ */
+export async function fetchYahooOhlcBars(
+  symbol: string,
+  rangeDays = 92,
+): Promise<OhlcBar[]> {
+  const period2 = Math.floor(Date.now() / 1000);
+  const period1 = period2 - rangeDays * 86400;
+  const encoded = encodeURIComponent(symbol);
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encoded}?period1=${period1}&period2=${period2}&interval=1d`;
+
+  const response = await fetch(url, { headers: YAHOO_HEADERS });
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`Yahoo HTTP ${response.status} for ${symbol}: ${text.slice(0, 200)}`);
+  }
+
+  const data: unknown = await response.json();
+  const chart = data as {
+    chart?: {
+      error?: unknown;
+      result?: Array<{
+        timestamp?: number[];
+        indicators?: { quote?: YahooQuoteRow[] };
+      }>;
+    };
+  };
+
+  if (chart.chart?.error) {
+    throw new Error(`Yahoo chart error for ${symbol}: ${JSON.stringify(chart.chart.error)}`);
+  }
+
+  const result = chart.chart?.result?.[0];
+  if (!result) {
+    throw new Error(`Yahoo: no result for ${symbol}`);
+  }
+
+  const timestamps = result.timestamp ?? [];
+  const quote = result.indicators?.quote?.[0];
+  const opens = quote?.open ?? [];
+  const highs = quote?.high ?? [];
+  const lows = quote?.low ?? [];
+  const closes = quote?.close ?? [];
+  const volumes = quote?.volume ?? [];
+
+  const out: OhlcBar[] = [];
+  let prevClose: number | null = null;
+
+  for (let i = 0; i < timestamps.length; i++) {
+    const hi = highs[i];
+    const lo = lows[i];
+    const cl = closes[i];
+    const op = opens[i];
+    const vol = volumes[i] ?? 0;
+
+    if (
+      typeof hi !== "number" ||
+      typeof lo !== "number" ||
+      typeof cl !== "number" ||
+      !Number.isFinite(hi) ||
+      !Number.isFinite(lo) ||
+      !Number.isFinite(cl) ||
+      hi <= 0 ||
+      lo <= 0 ||
+      cl <= 0
+    ) {
+      continue;
+    }
+
+    const open =
+      typeof op === "number" && Number.isFinite(op) && op > 0 ? op : (prevClose ?? cl);
+    const high = Math.max(hi, lo, open, cl);
+    const low = Math.min(hi, lo, open, cl);
+
+    out.push({
+      t: timestamps[i]!,
+      o: open,
+      h: high,
+      l: low,
+      c: cl,
+      v: typeof vol === "number" && Number.isFinite(vol) && vol >= 0 ? vol : 0,
+    });
+    prevClose = cl;
+  }
+
+  if (out.length === 0) {
+    throw new Error(`Yahoo: no valid OHLC bars for ${symbol}`);
   }
 
   return out;

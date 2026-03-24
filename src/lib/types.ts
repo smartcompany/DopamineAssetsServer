@@ -67,6 +67,8 @@ export type AssetDetailDto = {
   quoteCurrency: string | null;
   dataSources: string[];
   asOf: string;
+  /** 배치 LLM이 같은 UTC 일자에 저장한 요약 (없으면 null) */
+  moveSummaryKo: string | null;
 };
 
 export type FeedUniverseEntry = {

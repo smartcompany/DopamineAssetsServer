@@ -1,3 +1,4 @@
+import { fetchMoveSummaryKo } from "./asset-move-summary-batch";
 import { fetchBybitSpotInstrumentDetail } from "./bybit-instrument-detail";
 import type { AssetClass, AssetDetailDto, CommodityKind } from "./types";
 import { fetchYahooQuoteSummary } from "./yahoo-quote-summary";
@@ -85,7 +86,14 @@ export async function getAssetDetail(params: {
 
   const displayName = yahoo?.displayName ?? name ?? symbol;
 
-  const dto = {
+  let moveSummaryKo: string | null = null;
+  try {
+    moveSummaryKo = await fetchMoveSummaryKo({ symbol, assetClass });
+  } catch {
+    moveSummaryKo = null;
+  }
+
+  const dto: AssetDetailDto = {
     symbol,
     name: displayName,
     assetClass,
@@ -101,6 +109,7 @@ export async function getAssetDetail(params: {
     quoteCurrency,
     dataSources,
     asOf,
+    moveSummaryKo,
   };
   console.log("[asset-detail] response", JSON.stringify(dto));
   return dto;
