@@ -1,9 +1,5 @@
 import { jsonWithCors } from "@/lib/cors";
-import {
-  themesCrashed,
-  themesEmerging,
-  themesHot,
-} from "@/lib/themes-mock-data";
+import { getThemes } from "@/lib/themes-service";
 
 const kinds = ["hot", "crashed", "emerging"] as const;
 type Kind = (typeof kinds)[number];
@@ -22,13 +18,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const items =
-    kind === "hot"
-      ? themesHot
-      : kind === "crashed"
-        ? themesCrashed
-        : themesEmerging;
-
+  const { items } = await getThemes(kind);
   return jsonWithCors({ kind, items });
 }
 
