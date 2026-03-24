@@ -67,17 +67,19 @@ function finalizeRankings(
       ? rows.filter((r) => r.priceChangePct > 0)
       : rows.filter((r) => r.priceChangePct < 0);
 
+  // UI 카피가 "가장 미친 상승 / 가장 크게 박살" 이므로 **등락률(%) 우선** 정렬.
+  // (도파민 점수 우선이면 변동률 작은 원자재가 대형 하락 주식보다 위에 오는 등 역전됨)
   if (direction === "up") {
     filtered.sort((a, b) => {
-      const d = b.dopamineScore - a.dopamineScore;
+      const d = b.priceChangePct - a.priceChangePct;
       if (d !== 0) return d;
-      return b.priceChangePct - a.priceChangePct;
+      return b.dopamineScore - a.dopamineScore;
     });
   } else {
     filtered.sort((a, b) => {
-      const d = a.dopamineScore - b.dopamineScore;
+      const d = a.priceChangePct - b.priceChangePct;
       if (d !== 0) return d;
-      return a.priceChangePct - b.priceChangePct;
+      return b.dopamineScore - a.dopamineScore;
     });
   }
 
