@@ -1,6 +1,11 @@
 import { jsonWithCors } from "@/lib/cors";
+import { parseBearerUid } from "@/lib/auth-bearer";
 import { verifyFirebaseIdToken } from "@/lib/firebase-admin-app";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import {
+  fetchLikeCountsByCommentIds,
+  fetchLikedCommentIdsForUser,
+} from "@/lib/comment-like-counts";
 
 const CLASSES = new Set(["us_stock", "kr_stock", "crypto", "commodity"]);
 
@@ -20,9 +25,12 @@ export async function GET(request: Request) {
 
   try {
     const supabase = getSupabaseAdmin();
+    const viewerUid = await parseBearerUid(request);
     const { data, error } = await supabase
       .from("dopamine_asset_comments")
-      .select("id, parent_id, body, author_uid, author_display_name, created_at")
+      .select(
+        "id, parent_id, body, title, image_urls, author_uid, author_display_name, asset_display_name, created_at",
+      )
       .eq("asset_symbol", symbol)
       .eq("asset_class", assetClass)
       .order("created_at", { ascending: true });
@@ -35,7 +43,54 @@ export async function GET(request: Request) {
       );
     }
 
-    return jsonWithCors({ items: data ?? [] });
+    const rows = data ?? [];
+    const ids = rows.map((r) => r.id as string);
+    const authorUids = [...new Set(rows.map((r) => r.author_uid as string))];
+    const displayNameByUid = new Map<string, string>();
+    if (authorUids.length > 0) {
+      const { data: profs, error: profErr } = await supabase
+        .from("user_profiles")
+        .select("uid, display_name")
+        .in("uid", authorUids);
+      if (profErr) {
+        console.error(profErr);
+      } else {
+        for (const p of profs ?? []) {
+          const uid = p.uid as string;
+          const dn = (p.display_name as string | null)?.trim();
+          if (dn && dn.length > 0) {
+            displayNameByUid.set(uid, dn);
+          }
+        }
+      }
+    }
+
+    const [likeCounts, likedSet] = await Promise.all([
+      fetchLikeCountsByCommentIds(supabase, ids),
+      viewerUid
+        ? fetchLikedCommentIdsForUser(supabase, ids, viewerUid)
+        : Promise.resolve(new Set<string>()),
+    ]);
+
+    const items = rows.map((r) => {
+      const id = r.id as string;
+      const uid = r.author_uid as string;
+      const fromProfile = displayNameByUid.get(uid);
+      const rawStored = r.author_display_name;
+      const stored =
+        typeof rawStored === "string" && rawStored.trim().length > 0
+          ? rawStored.trim()
+          : "User";
+      const author_display_name = fromProfile ?? stored;
+      return {
+        ...r,
+        author_display_name,
+        like_count: likeCounts.get(id) ?? 0,
+        liked_by_me: likedSet.has(id),
+      };
+    });
+
+    return jsonWithCors({ items });
   } catch (e) {
     console.error(e);
     const msg = e instanceof Error ? e.message : "unknown";
@@ -94,6 +149,36 @@ export async function POST(request: Request) {
         ? o.parentId.trim()
         : "";
 
+  const rawTitle = o["title"];
+  const titleRaw = typeof rawTitle === "string" ? rawTitle.trim() : "";
+  const titleOut =
+    titleRaw.length > 0 ? titleRaw.slice(0, 200) : null;
+
+  const rawUrls = o["imageUrls"];
+  const imageUrls: string[] = [];
+  if (Array.isArray(rawUrls)) {
+    for (const u of rawUrls) {
+      if (
+        typeof u === "string" &&
+        u.trim().length > 0 &&
+        u.startsWith("https://") &&
+        u.length < 2048
+      ) {
+        imageUrls.push(u.trim());
+      }
+    }
+  }
+  const imageUrlsOut = imageUrls.slice(0, 8);
+
+  const rawAssetDisplayName = o["assetDisplayName"];
+  let assetDisplayName: string | null = null;
+  if (typeof rawAssetDisplayName === "string") {
+    const t = rawAssetDisplayName.trim();
+    if (t.length > 0) {
+      assetDisplayName = t.slice(0, 200);
+    }
+  }
+
   if (!symbol || !assetClass || !CLASSES.has(assetClass)) {
     return jsonWithCors({ error: "invalid_symbol_or_class" }, { status: 400 });
   }
@@ -107,10 +192,20 @@ export async function POST(request: Request) {
   try {
     const supabase = getSupabaseAdmin();
 
+    const { data: profRow } = await supabase
+      .from("user_profiles")
+      .select("display_name")
+      .eq("uid", uid)
+      .maybeSingle();
+    const profileName = (profRow?.display_name as string | null)?.trim();
+    if (profileName && profileName.length > 0) {
+      displayName = profileName;
+    }
+
     if (parentId) {
       const { data: parentRow, error: parentErr } = await supabase
         .from("dopamine_asset_comments")
-        .select("id, asset_symbol, asset_class")
+        .select("id, asset_symbol, asset_class, asset_display_name")
         .eq("id", parentId)
         .maybeSingle();
 
@@ -119,6 +214,12 @@ export async function POST(request: Request) {
       }
       if (parentRow.asset_symbol !== symbol || parentRow.asset_class !== assetClass) {
         return jsonWithCors({ error: "parent_mismatch" }, { status: 400 });
+      }
+      if (!assetDisplayName) {
+        const pn = (parentRow.asset_display_name as string | null)?.trim();
+        if (pn && pn.length > 0) {
+          assetDisplayName = pn.slice(0, 200);
+        }
       }
     }
 
@@ -129,10 +230,15 @@ export async function POST(request: Request) {
         asset_class: assetClass as AssetClass,
         parent_id: parentId,
         body: text,
+        title: titleOut,
+        image_urls: imageUrlsOut.length > 0 ? imageUrlsOut : [],
         author_uid: uid,
         author_display_name: displayName,
+        asset_display_name: assetDisplayName,
       })
-      .select("id, parent_id, body, author_uid, author_display_name, created_at")
+      .select(
+        "id, parent_id, body, title, image_urls, author_uid, author_display_name, asset_display_name, created_at",
+      )
       .single();
 
     if (insertErr) {
