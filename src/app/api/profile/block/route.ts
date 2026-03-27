@@ -17,31 +17,46 @@ export async function POST(request: Request) {
   if (typeof body !== "object" || body === null) {
     return jsonWithCors({ error: "invalid_body" }, { status: 400 });
   }
-  const o = body as Record<string, unknown>;
-  const rawTarget = o["targetUid"];
-  const targetUid =
-    typeof rawTarget === "string" ? rawTarget.trim() : "";
+
+  const raw = (body as Record<string, unknown>).targetUid;
+  const targetUid = typeof raw === "string" ? raw.trim() : "";
   if (!targetUid || targetUid === uid) {
     return jsonWithCors({ error: "invalid_target" }, { status: 400 });
   }
 
   try {
     const supabase = getSupabaseAdmin();
-    const { error } = await supabase.from("dopamine_user_follows").insert({
-      follower_uid: uid,
-      following_uid: targetUid,
+    const { error: blockErr } = await supabase.from("dopamine_user_blocks").insert({
+      blocker_uid: uid,
+      blocked_uid: targetUid,
     });
-    if (error) {
-      if (error.code === "23505") {
-        return jsonWithCors({ ok: true, alreadyFollowing: true });
-      }
-      console.error(error);
+    if (blockErr && blockErr.code !== "23505") {
+      console.error(blockErr);
       return jsonWithCors(
-        { error: "supabase_error", detail: error.message },
+        { error: "supabase_error", detail: blockErr.message },
         { status: 500 },
       );
     }
-    return jsonWithCors({ ok: true });
+
+    // 차단 시 상호 팔로우 관계는 정리
+    const { error: unfollow1 } = await supabase
+      .from("dopamine_user_follows")
+      .delete()
+      .eq("follower_uid", uid)
+      .eq("following_uid", targetUid);
+    if (unfollow1) {
+      console.error(unfollow1);
+    }
+    const { error: unfollow2 } = await supabase
+      .from("dopamine_user_follows")
+      .delete()
+      .eq("follower_uid", targetUid)
+      .eq("following_uid", uid);
+    if (unfollow2) {
+      console.error(unfollow2);
+    }
+
+    return jsonWithCors({ ok: true, blocked: true });
   } catch (e) {
     console.error(e);
     const msg = e instanceof Error ? e.message : "unknown";
@@ -64,10 +79,10 @@ export async function DELETE(request: Request) {
   try {
     const supabase = getSupabaseAdmin();
     const { error } = await supabase
-      .from("dopamine_user_follows")
+      .from("dopamine_user_blocks")
       .delete()
-      .eq("follower_uid", uid)
-      .eq("following_uid", targetUid);
+      .eq("blocker_uid", uid)
+      .eq("blocked_uid", targetUid);
     if (error) {
       console.error(error);
       return jsonWithCors(
@@ -75,7 +90,7 @@ export async function DELETE(request: Request) {
         { status: 500 },
       );
     }
-    return jsonWithCors({ ok: true });
+    return jsonWithCors({ ok: true, blocked: false });
   } catch (e) {
     console.error(e);
     const msg = e instanceof Error ? e.message : "unknown";

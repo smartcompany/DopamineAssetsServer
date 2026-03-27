@@ -14,6 +14,14 @@ const ALLOWED_TYPES = new Set([
   "image/heic",
 ]);
 
+function resolveTopLevelFolder(formData: FormData): "community_posts" | "profiles" {
+  const raw = formData.get("scope");
+  if (typeof raw !== "string") return "community_posts";
+  const scope = raw.trim().toLowerCase();
+  if (scope === "profile") return "profiles";
+  return "community_posts";
+}
+
 function extForMime(mime: string): string {
   switch (mime) {
     case "image/png":
@@ -82,7 +90,8 @@ export async function POST(request: Request) {
 
   const ext = extForMime(mime);
   const name = `${Date.now()}_${Math.random().toString(36).slice(2, 12)}.${ext}`;
-  const path = `community_posts/${uid}/${name}`;
+  const topFolder = resolveTopLevelFolder(formData);
+  const path = `${topFolder}/${uid}/${name}`;
 
   try {
     const supabase = getSupabaseAdmin();

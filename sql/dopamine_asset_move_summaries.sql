@@ -16,6 +16,7 @@ create table if not exists public.dopamine_asset_move_summaries (
   ),
   constraint dopamine_move_summaries_unique unique (symbol, asset_class, summary_date)
 );
+alter table public.dopamine_asset_move_summaries enable row level security;
 
 create index if not exists dopamine_move_summaries_lookup_idx
   on public.dopamine_asset_move_summaries (symbol, asset_class, summary_date desc);

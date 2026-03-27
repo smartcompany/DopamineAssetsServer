@@ -24,6 +24,7 @@ export async function GET(request: Request) {
 
   const symbol = url.searchParams.get("symbol")?.trim();
   const assetClass = url.searchParams.get("assetClass")?.trim();
+  const authorUid = url.searchParams.get("authorUid")?.trim();
   const bodyTerms = parseBodyTerms(url);
 
   try {
@@ -33,6 +34,7 @@ export async function GET(request: Request) {
       {
         assetSymbol: symbol && assetClass ? symbol : undefined,
         assetClass: symbol && assetClass ? assetClass : undefined,
+        authorUid: authorUid && authorUid.length > 0 ? authorUid : undefined,
         bodyTerms: bodyTerms.length > 0 ? bodyTerms : undefined,
       },
       viewerUid,

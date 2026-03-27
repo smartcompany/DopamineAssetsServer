@@ -19,11 +19,11 @@ export async function GET(request: Request) {
           .eq("author_uid", uid)
           .is("parent_id", null),
         supabase
-          .from("user_follows")
+          .from("dopamine_user_follows")
           .select("follower_uid", { count: "exact", head: true })
           .eq("follower_uid", uid),
         supabase
-          .from("user_follows")
+          .from("dopamine_user_follows")
           .select("following_uid", { count: "exact", head: true })
           .eq("following_uid", uid),
       ]);

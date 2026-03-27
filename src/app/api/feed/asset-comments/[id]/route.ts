@@ -46,7 +46,7 @@ export async function GET(_request: Request, ctx: RouteCtx) {
     let displayNameByUid = new Map<string, string>();
     if (authorUid) {
       const { data: profs } = await supabase
-        .from("user_profiles")
+        .from("dopamine_user_profiles")
         .select("uid, display_name")
         .eq("uid", authorUid)
         .maybeSingle();

@@ -49,7 +49,7 @@ export async function GET(request: Request) {
     const displayNameByUid = new Map<string, string>();
     if (authorUids.length > 0) {
       const { data: profs, error: profErr } = await supabase
-        .from("user_profiles")
+        .from("dopamine_user_profiles")
         .select("uid, display_name")
         .in("uid", authorUids);
       if (profErr) {
@@ -193,7 +193,7 @@ export async function POST(request: Request) {
     const supabase = getSupabaseAdmin();
 
     const { data: profRow } = await supabase
-      .from("user_profiles")
+      .from("dopamine_user_profiles")
       .select("display_name")
       .eq("uid", uid)
       .maybeSingle();

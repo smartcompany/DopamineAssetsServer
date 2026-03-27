@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     }
 
     const { data: existing } = await supabase
-      .from("comment_likes")
+      .from("dopamine_comment_likes")
       .select("comment_id")
       .eq("comment_id", commentId)
       .eq("user_uid", uid)
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
 
     if (existing) {
       const { error: delErr } = await supabase
-        .from("comment_likes")
+        .from("dopamine_comment_likes")
         .delete()
         .eq("comment_id", commentId)
         .eq("user_uid", uid);
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
         );
       }
     } else {
-      const { error: insErr } = await supabase.from("comment_likes").insert({
+      const { error: insErr } = await supabase.from("dopamine_comment_likes").insert({
         comment_id: commentId,
         user_uid: uid,
       });
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
     }
 
     const { count, error: cntErr } = await supabase
-      .from("comment_likes")
+      .from("dopamine_comment_likes")
       .select("user_uid", { count: "exact", head: true })
       .eq("comment_id", commentId);
 

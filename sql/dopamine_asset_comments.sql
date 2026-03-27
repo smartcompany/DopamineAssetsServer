@@ -25,6 +25,7 @@ create table if not exists public.dopamine_asset_comments (
     asset_class in ('us_stock', 'kr_stock', 'crypto', 'commodity')
   )
 );
+alter table public.dopamine_asset_comments enable row level security;
 
 create index if not exists dopamine_asset_comments_asset_idx
   on public.dopamine_asset_comments (asset_symbol, asset_class, created_at asc);

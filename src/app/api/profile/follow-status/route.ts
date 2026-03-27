@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   try {
     const supabase = getSupabaseAdmin();
     const { data: rows, error } = await supabase
-      .from("user_follows")
+      .from("dopamine_user_follows")
       .select("following_uid")
       .eq("follower_uid", uid)
       .in("following_uid", targetUids);

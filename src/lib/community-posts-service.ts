@@ -12,6 +12,8 @@ export type CommunityPostRow = {
   image_urls: string[];
   author_uid: string;
   author_display_name: string | null;
+  /** 앱 프로필 DB(dopamine_user_profiles.photo_url) 사진 URL */
+  author_photo_url: string | null;
   created_at: string;
   asset_symbol: string;
   asset_class: string;
@@ -31,6 +33,8 @@ export type CommunityPostsFilter = {
   /** Both required to filter by one listing */
   assetSymbol?: string;
   assetClass?: string;
+  /** 특정 작성자 글만 조회 */
+  authorUid?: string;
   /** 본문에 이 중 하나라도 포함(대소문자 무시). 심볼 필터와 동시에 쓰이면 OR 로 합칩니다. */
   bodyTerms?: string[];
 };
@@ -60,6 +64,62 @@ function rowMatchesBodyTerms(
   const blob = `${title ?? ""} ${body}`.toLowerCase();
   const lower = terms.map((t) => t.toLowerCase());
   return lower.some((fragment) => blob.includes(fragment));
+}
+
+async function fetchAuthorPhotoUrlsByUid(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  uids: string[],
+): Promise<Map<string, string | null>> {
+  const out = new Map<string, string | null>();
+  if (uids.length === 0) return out;
+  const uniq = [...new Set(uids)];
+  try {
+    const { data, error } = await supabase
+      .from("dopamine_user_profiles")
+      .select("uid, photo_url")
+      .in("uid", uniq);
+    if (error) {
+      console.error("[community-posts] profile photo fetch", error);
+      return out;
+    }
+    for (const row of data ?? []) {
+      const uid = row.uid as string;
+      const photoUrl = (row.photo_url as string | null)?.trim() || null;
+      out.set(uid, photoUrl);
+    }
+  } catch (e) {
+    console.error("[community-posts] profile photo fetch", e);
+  }
+  return out;
+}
+
+async function fetchHiddenAuthorUids(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  viewerUid?: string | null,
+): Promise<Set<string>> {
+  const out = new Set<string>();
+  if (!viewerUid) return out;
+
+  const [{ data: blockingRows }, { data: blockedByRows }] = await Promise.all([
+    supabase
+      .from("dopamine_user_blocks")
+      .select("blocked_uid")
+      .eq("blocker_uid", viewerUid),
+    supabase
+      .from("dopamine_user_blocks")
+      .select("blocker_uid")
+      .eq("blocked_uid", viewerUid),
+  ]);
+
+  for (const r of blockingRows ?? []) {
+    const uid = r.blocked_uid as string;
+    if (uid) out.add(uid);
+  }
+  for (const r of blockedByRows ?? []) {
+    const uid = r.blocker_uid as string;
+    if (uid) out.add(uid);
+  }
+  return out;
 }
 
 function parseRoot(r: Record<string, unknown>): RootRow {
@@ -93,6 +153,7 @@ export async function getCommunityPosts(
 
   const symbol = filter.assetSymbol?.trim();
   const assetClass = filter.assetClass?.trim();
+  const authorUid = filter.authorUid?.trim();
   const hasSymbolFilter = Boolean(symbol && assetClass);
 
   const terms = (filter.bodyTerms ?? [])
@@ -184,9 +245,18 @@ export async function getCommunityPosts(
     roots = rootsRaw.map((r) => parseRoot(r as Record<string, unknown>));
   }
 
+  const hiddenAuthorUids = await fetchHiddenAuthorUids(supabase, viewerUid);
+  roots = roots.filter((r) => !hiddenAuthorUids.has(r.author_uid));
+  if (authorUid && authorUid.length > 0) {
+    roots = roots.filter((r) => r.author_uid === authorUid);
+  }
+
   if (!roots.length) {
     return [];
   }
+
+  const authorUids = [...new Set(roots.map((r) => r.author_uid))];
+  const photoByUid = await fetchAuthorPhotoUrlsByUid(supabase, authorUids);
 
   const ids = roots.map((r) => r.id);
 
@@ -223,6 +293,7 @@ export async function getCommunityPosts(
       image_urls: r.image_urls,
       author_uid: r.author_uid,
       author_display_name: r.author_display_name,
+      author_photo_url: photoByUid.get(r.author_uid) ?? null,
       created_at: r.created_at,
       asset_symbol: r.asset_symbol,
       asset_class: r.asset_class,

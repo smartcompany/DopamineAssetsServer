@@ -10,7 +10,7 @@ export async function fetchLikeCountsByCommentIds(
     return out;
   }
   const { data, error } = await supabase
-    .from("comment_likes")
+    .from("dopamine_comment_likes")
     .select("comment_id")
     .in("comment_id", commentIds);
 
@@ -35,7 +35,7 @@ export async function fetchLikedCommentIdsForUser(
     return set;
   }
   const { data, error } = await supabase
-    .from("comment_likes")
+    .from("dopamine_comment_likes")
     .select("comment_id")
     .eq("user_uid", userUid)
     .in("comment_id", commentIds);

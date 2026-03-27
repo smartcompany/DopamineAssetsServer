@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   try {
     const supabase = getSupabaseAdmin();
     const { data: rows, error } = await supabase
-      .from("user_follows")
+      .from("dopamine_user_follows")
       .select("following_uid, created_at")
       .eq("follower_uid", uid)
       .order("created_at", { ascending: false });
@@ -30,7 +30,7 @@ export async function GET(request: Request) {
     }
 
     const { data: profiles } = await supabase
-      .from("user_profiles")
+      .from("dopamine_user_profiles")
       .select("uid, display_name")
       .in("uid", ids);
 

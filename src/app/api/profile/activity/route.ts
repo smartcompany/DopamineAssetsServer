@@ -58,7 +58,7 @@ async function loadProfileNames(
   const map = new Map<string, string | null>();
   if (uniq.length === 0) return map;
   const { data } = await supabase
-    .from("user_profiles")
+    .from("dopamine_user_profiles")
     .select("uid, display_name")
     .in("uid", uniq);
   for (const p of data ?? []) {
@@ -304,7 +304,7 @@ export async function GET(request: Request) {
     const mineIds = (myCommentIds ?? []).map((x) => x.id as string);
     if (mineIds.length > 0) {
       const { data: likesIn } = await supabase
-        .from("comment_likes")
+        .from("dopamine_comment_likes")
         .select("comment_id, user_uid, created_at")
         .in("comment_id", mineIds)
         .neq("user_uid", uid)
