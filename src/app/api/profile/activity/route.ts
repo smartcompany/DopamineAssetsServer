@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { resolveYahooSymbol } from "@/lib/asset-detail-service";
 import {
   fetchLikeCountsByCommentIds,
+  fetchLikedCommentIdsForUser,
   fetchReplyCountsByParentIds,
 } from "@/lib/comment-like-counts";
 import { fetchYahooQuoteSummary } from "@/lib/yahoo-quote-summary";
@@ -26,6 +27,12 @@ type ActivityItem = {
   assetDisplayName?: string;
   likeCount?: number;
   replyCount?: number;
+  /** my_post / my_reply — 커뮤니티 카드와 동일 표시용 */
+  body?: string;
+  title?: string | null;
+  imageUrls?: string[];
+  postAuthorDisplayName?: string;
+  likedByMe?: boolean;
   /** reply_on_my_post */
   actorUid?: string;
   actorDisplayName?: string | null;
@@ -107,10 +114,13 @@ export async function GET(request: Request) {
     const supabase = getSupabaseAdmin();
     const items: ActivityItem[] = [];
 
+    const selfNameMap = await loadProfileNames(supabase, [uid]);
+    const selfProfName = selfNameMap.get(uid)?.trim();
+
     const { data: myRoots } = await supabase
       .from("dopamine_asset_comments")
       .select(
-        "id, body, created_at, asset_symbol, asset_class",
+        "id, body, title, image_urls, created_at, asset_symbol, asset_class, author_display_name",
       )
       .eq("author_uid", uid)
       .is("parent_id", null)
@@ -118,7 +128,7 @@ export async function GET(request: Request) {
       .limit(LIMIT_EACH);
 
     const myPostIds = (myRoots ?? []).map((r) => r.id as string);
-    const [likeMap, replyMap, nameMap] = await Promise.all([
+    const [likeMap, replyMap, nameMap, likedRootSet] = await Promise.all([
       fetchLikeCountsByCommentIds(supabase, myPostIds),
       fetchReplyCountsByParentIds(supabase, myPostIds),
       resolveAssetDisplayNames(
@@ -127,17 +137,50 @@ export async function GET(request: Request) {
           assetClass: r.asset_class as string,
         })),
       ),
+      fetchLikedCommentIdsForUser(supabase, myPostIds, uid),
     ]);
 
     for (const r of myRoots ?? []) {
       const sym = r.asset_symbol as string;
       const cls = r.asset_class as string;
       const pk = pairKey(sym, cls);
+      const rawTitle = r.title;
+      const title =
+        typeof rawTitle === "string" && rawTitle.trim().length > 0
+          ? rawTitle.trim().slice(0, 200)
+          : null;
+      const rawUrls = r.image_urls;
+      const imageUrls: string[] = [];
+      if (Array.isArray(rawUrls)) {
+        for (const u of rawUrls) {
+          if (
+            typeof u === "string" &&
+            u.trim().length > 0 &&
+            u.startsWith("https://") &&
+            u.length < 2048
+          ) {
+            imageUrls.push(u.trim());
+          }
+        }
+      }
+      const rawStored = r.author_display_name as string | null;
+      const stored =
+        typeof rawStored === "string" && rawStored.trim().length > 0
+          ? rawStored.trim()
+          : "User";
+      const postAuthorDisplayName =
+        selfProfName && selfProfName.length > 0 ? selfProfName : stored;
+
       items.push({
         kind: "my_post",
         at: r.created_at as string,
         commentId: r.id as string,
         bodyPreview: preview(r.body as string),
+        body: r.body as string,
+        title,
+        imageUrls,
+        postAuthorDisplayName,
+        likedByMe: likedRootSet.has(r.id as string),
         assetSymbol: sym,
         assetClass: cls,
         assetDisplayName: nameMap.get(pk) ?? sym,
@@ -149,21 +192,73 @@ export async function GET(request: Request) {
     const { data: myReplies } = await supabase
       .from("dopamine_asset_comments")
       .select(
-        "id, body, created_at, asset_symbol, asset_class",
+        "id, body, title, image_urls, created_at, asset_symbol, asset_class, author_display_name",
       )
       .eq("author_uid", uid)
       .not("parent_id", "is", null)
       .order("created_at", { ascending: false })
       .limit(LIMIT_EACH);
 
+    const myReplyIds = (myReplies ?? []).map((r) => r.id as string);
+    const [likeReplyMap, replyToReplyMap, nameMapReplies, likedReplySet] =
+      await Promise.all([
+        fetchLikeCountsByCommentIds(supabase, myReplyIds),
+        fetchReplyCountsByParentIds(supabase, myReplyIds),
+        resolveAssetDisplayNames(
+          (myReplies ?? []).map((r) => ({
+            symbol: r.asset_symbol as string,
+            assetClass: r.asset_class as string,
+          })),
+        ),
+        fetchLikedCommentIdsForUser(supabase, myReplyIds, uid),
+      ]);
+
     for (const r of myReplies ?? []) {
+      const sym = r.asset_symbol as string;
+      const cls = r.asset_class as string;
+      const pk = pairKey(sym, cls);
+      const rawTitle = r.title;
+      const title =
+        typeof rawTitle === "string" && rawTitle.trim().length > 0
+          ? rawTitle.trim().slice(0, 200)
+          : null;
+      const rawUrls = r.image_urls;
+      const imageUrls: string[] = [];
+      if (Array.isArray(rawUrls)) {
+        for (const u of rawUrls) {
+          if (
+            typeof u === "string" &&
+            u.trim().length > 0 &&
+            u.startsWith("https://") &&
+            u.length < 2048
+          ) {
+            imageUrls.push(u.trim());
+          }
+        }
+      }
+      const rawStored = r.author_display_name as string | null;
+      const stored =
+        typeof rawStored === "string" && rawStored.trim().length > 0
+          ? rawStored.trim()
+          : "User";
+      const postAuthorDisplayName =
+        selfProfName && selfProfName.length > 0 ? selfProfName : stored;
+
       items.push({
         kind: "my_reply",
         at: r.created_at as string,
         commentId: r.id as string,
         bodyPreview: preview(r.body as string),
-        assetSymbol: r.asset_symbol as string,
-        assetClass: r.asset_class as string,
+        body: r.body as string,
+        title,
+        imageUrls,
+        postAuthorDisplayName,
+        likedByMe: likedReplySet.has(r.id as string),
+        assetSymbol: sym,
+        assetClass: cls,
+        assetDisplayName: nameMapReplies.get(pk) ?? sym,
+        likeCount: likeReplyMap.get(r.id as string) ?? 0,
+        replyCount: replyToReplyMap.get(r.id as string) ?? 0,
       });
     }
 
