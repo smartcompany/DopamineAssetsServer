@@ -95,8 +95,15 @@ function refineNewsItems(
   query: string,
   limit: number,
 ): AssetNewsItem[] {
-  const cap = Math.min(30, Math.max(raw.length, limit));
+  const multi = isMultiSegmentSearchQuery(query);
+  const cap = multi
+    ? Math.min(100, Math.max(raw.length, limit * 4))
+    : Math.min(30, Math.max(raw.length, limit));
   const deduped = dedupeNewsByTitle(raw, cap);
+  if (multi) {
+    // 다중 티커: 헤드라인에 티커 문자열이 안 나오는 경우가 많아(브랜드명·일반어) 공급자 결과를 그대로 사용
+    return deduped.slice(0, limit);
+  }
   const tokens = tokenizeQueryForRelevance(query);
   if (tokens.length === 0) {
     return deduped.slice(0, limit);
@@ -111,6 +118,39 @@ function refineNewsItems(
 function looksLikeTickerList(q: string): boolean {
   const t = q.trim();
   return /^[A-Za-z0-9]+(?:,[A-Za-z0-9]+)*$/.test(t) && t.length <= 80;
+}
+
+/** 콤마로 잇된 검색(테마 구성 티커 등) — 제목 토큰 필터가 과하게 걸러 502에 가깝게 빈 결과가 나기 쉬움 */
+function isMultiSegmentSearchQuery(query: string): boolean {
+  const parts = query
+    .split(",")
+    .map((s) => s.trim())
+    .filter((p) => p.length > 0);
+  return parts.length >= 2;
+}
+
+/**
+ * NewsData / GNews / Google News RSS 는 콤마 나열을 AND에 가깝게 해석하는 경우가 많음.
+ * 티커 바구니는 `A OR B OR C` 형태로 보내 "어느 하나" 관련 기사를 모은다.
+ */
+function buildOrQueryForNewsProviders(rawQuery: string): string {
+  const trimmed = rawQuery.trim();
+  if (!isMultiSegmentSearchQuery(trimmed)) {
+    return trimmed;
+  }
+  const parts = trimmed
+    .split(",")
+    .map((s) => s.trim())
+    .filter((p) => p.length > 0);
+  return parts
+    .map((p) => {
+      if (/[^a-zA-Z0-9.]/.test(p)) {
+        const safe = p.replace(/"/g, "");
+        return `"${safe}"`;
+      }
+      return p;
+    })
+    .join(" OR ");
 }
 
 function toCryptoPanicCurrencies(q: string): string {
@@ -186,7 +226,7 @@ async function fetchNewsData(query: string, limit: number): Promise<AssetNewsIte
 
   const url = new URL(NEWSDATA_URL);
   url.searchParams.set("apikey", key);
-  url.searchParams.set("q", query.trim());
+  url.searchParams.set("q", buildOrQueryForNewsProviders(query));
   url.searchParams.set("language", "en");
   url.searchParams.set("category", "business");
 
@@ -324,7 +364,7 @@ async function fetchGoogleNewsRss(
   region: "us" | "kr" = "us",
 ): Promise<AssetNewsItem[] | null> {
   const url = new URL("https://news.google.com/rss/search");
-  url.searchParams.set("q", query.trim());
+  url.searchParams.set("q", buildOrQueryForNewsProviders(query));
   if (region === "kr") {
     url.searchParams.set("hl", "ko");
     url.searchParams.set("gl", "KR");
@@ -384,7 +424,10 @@ export async function fetchAssetNews(
 ): Promise<AssetNewsFetchResult | { ok: false; error: string; detail?: string }> {
   const q = query.trim();
   const lim = Math.min(Math.max(1, limit), 30);
-  const fetchCap = Math.min(30, Math.max(lim * 3, lim));
+  const multi = isMultiSegmentSearchQuery(q);
+  const fetchCap = multi
+    ? Math.min(100, Math.max(lim * 5, 40))
+    : Math.min(30, Math.max(lim * 3, lim));
   const assetClass = options?.assetClass?.trim();
 
   const errors: string[] = [];

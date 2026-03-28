@@ -1,8 +1,9 @@
 import { jsonWithCors } from "@/lib/cors";
-import { getAssetDetail } from "@/lib/asset-detail-service";
+import { getAssetDetail, getThemeAssetDetail } from "@/lib/asset-detail-service";
+import { resolveThemeIdByDisplayName } from "@/lib/theme-definitions";
 import type { AssetClass, CommodityKind } from "@/lib/types";
 
-const CLASSES = new Set<AssetClass>(["us_stock", "kr_stock", "crypto", "commodity"]);
+const CLASSES = new Set<AssetClass>(["us_stock", "kr_stock", "crypto", "commodity", "theme"]);
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -16,6 +17,30 @@ export async function GET(request: Request) {
   }
   if (!assetClass || !CLASSES.has(assetClass)) {
     return jsonWithCors({ error: "invalid_asset_class" }, { status: 400 });
+  }
+
+  if (assetClass === "theme") {
+    let themeId = url.searchParams.get("themeId")?.trim() ?? "";
+    if (!themeId) {
+      themeId =
+        resolveThemeIdByDisplayName(symbol) ??
+        resolveThemeIdByDisplayName(name) ??
+        "";
+    }
+    if (!themeId) {
+      return jsonWithCors(
+        { error: "missing_theme_id", hint: "Pass themeId or a known theme display name" },
+        { status: 400 },
+      );
+    }
+    try {
+      const displayName =
+        name.length > 0 ? name : symbol.length > 0 ? symbol : themeId;
+      const data = getThemeAssetDetail(themeId, displayName);
+      return jsonWithCors(data);
+    } catch {
+      return jsonWithCors({ error: "unknown_theme" }, { status: 404 });
+    }
   }
 
   try {

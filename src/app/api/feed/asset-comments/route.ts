@@ -8,9 +8,9 @@ import {
 } from "@/lib/comment-like-counts";
 import { checkBannedWords } from "@/lib/validate-banned-words";
 
-const CLASSES = new Set(["us_stock", "kr_stock", "crypto", "commodity"]);
+const CLASSES = new Set(["us_stock", "kr_stock", "crypto", "commodity", "theme"]);
 
-type AssetClass = "us_stock" | "kr_stock" | "crypto" | "commodity";
+type AssetClass = "us_stock" | "kr_stock" | "crypto" | "commodity" | "theme";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);

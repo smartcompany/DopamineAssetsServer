@@ -39,7 +39,7 @@ export default function Home() {
             className="underline"
             href="/api/themes?kind=hot"
           >
-            GET /api/themes?kind=hot|crashed|emerging
+            GET /api/themes?kind=hot|crashed|emerging (optional locale=ko|en)
           </Link>
         </li>
         <li>

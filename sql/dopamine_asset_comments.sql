@@ -22,7 +22,7 @@ create table if not exists public.dopamine_asset_comments (
     char_length(body) between 1 and 2000
   ),
   constraint dopamine_asset_comments_class_check check (
-    asset_class in ('us_stock', 'kr_stock', 'crypto', 'commodity')
+    asset_class in ('us_stock', 'kr_stock', 'crypto', 'commodity', 'theme')
   )
 );
 alter table public.dopamine_asset_comments enable row level security;

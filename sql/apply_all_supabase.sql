@@ -26,7 +26,7 @@ create table if not exists public.dopamine_asset_comments (
     char_length(body) between 1 and 2000
   ),
   constraint dopamine_asset_comments_class_check check (
-    asset_class in ('us_stock', 'kr_stock', 'crypto', 'commodity')
+    asset_class in ('us_stock', 'kr_stock', 'crypto', 'commodity', 'theme')
   )
 );
 alter table public.dopamine_asset_comments enable row level security;
@@ -182,7 +182,7 @@ create table if not exists public.dopamine_asset_move_summaries (
   batch_run_at timestamptz not null default now(),
   created_at timestamptz not null default now(),
   constraint dopamine_move_summaries_class check (
-    asset_class in ('us_stock', 'kr_stock', 'crypto', 'commodity')
+    asset_class in ('us_stock', 'kr_stock', 'crypto', 'commodity', 'theme')
   ),
   constraint dopamine_move_summaries_unique unique (symbol, asset_class, summary_date)
 );

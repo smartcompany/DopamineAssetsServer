@@ -1,5 +1,6 @@
 import { fetchMoveSummaryKo } from "./asset-move-summary-batch";
 import { fetchBybitSpotInstrumentDetail } from "./bybit-instrument-detail";
+import { THEME_DEFINITIONS } from "./theme-definitions";
 import type { AssetClass, AssetDetailDto, CommodityKind } from "./types";
 import { fetchYahooQuoteSummary } from "./yahoo-quote-summary";
 
@@ -35,6 +36,8 @@ export function resolveYahooSymbol(
       const y = cryptoSymbolToYahooUsd(s);
       return y;
     }
+    case "theme":
+      return null;
     default:
       return null;
   }
@@ -113,4 +116,34 @@ export async function getAssetDetail(params: {
   };
   console.log("[asset-detail] response", JSON.stringify(dto));
   return dto;
+}
+
+/** 테마 상세 — Yahoo 프로필 없이 최소 필드만 (앱은 랭킹 행의 가격·점수를 그대로 표시). */
+export function getThemeAssetDetail(themeId: string, displayName: string): AssetDetailDto {
+  const def = THEME_DEFINITIONS.find((d) => d.id === themeId);
+  if (!def) {
+    throw new Error("unknown_theme");
+  }
+  const label = displayName.trim();
+  const sym = label.length > 0 ? label : def.id;
+  const asOf = new Date().toISOString();
+  return {
+    symbol: sym,
+    name: sym,
+    assetClass: "theme",
+    themeId,
+    themeSymbols: [...def.symbols],
+    sector: null,
+    industry: null,
+    marketCap: null,
+    exchange: null,
+    currency: null,
+    description: null,
+    website: null,
+    baseCurrency: null,
+    quoteCurrency: null,
+    dataSources: ["theme_definition"],
+    asOf,
+    moveSummaryKo: null,
+  };
 }

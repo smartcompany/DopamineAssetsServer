@@ -1,4 +1,4 @@
-export type AssetClass = "us_stock" | "kr_stock" | "crypto" | "commodity";
+export type AssetClass = "us_stock" | "kr_stock" | "crypto" | "commodity" | "theme";
 
 export type CommodityKind =
   | "crude_oil"
@@ -41,6 +41,11 @@ export type ThemeItemDto = {
   volumeLiftPct: number;
   symbolCount: number;
   themeScore: number;
+  /** Yahoo 티커 목록 — 뉴스 검색·클라이언트 표시용 */
+  symbols: string[];
+  /** 종목 상세 진입용 — 테마 구성 첫 심볼 + 추정 asset_class */
+  detailSymbol: string;
+  detailAssetClass: AssetClass;
 };
 
 export type MarketSummaryDto = {
@@ -54,6 +59,10 @@ export type AssetDetailDto = {
   symbol: string;
   name: string;
   assetClass: AssetClass;
+  /** [assetClass] === theme 일 때만 — 차트·구성 조회용 */
+  themeId?: string;
+  /** [assetClass] === theme 일 때만 — 뉴스 티커 검색 */
+  themeSymbols?: string[];
   commodityKind?: CommodityKind;
   /** 섹터·대분류 */
   sector: string | null;
