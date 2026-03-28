@@ -31,18 +31,28 @@ export async function GET(request: Request) {
 
     const { data: profiles } = await supabase
       .from("dopamine_user_profiles")
-      .select("uid, display_name")
+      .select("uid, display_name, photo_url")
       .in("uid", ids);
 
-    const nameByUid = new Map<string, string | null>();
+    const profileByUid = new Map<
+      string,
+      { displayName: string | null; photoUrl: string | null }
+    >();
     for (const p of profiles ?? []) {
-      nameByUid.set(p.uid as string, (p.display_name as string | null) ?? null);
+      profileByUid.set(p.uid as string, {
+        displayName: (p.display_name as string | null) ?? null,
+        photoUrl: (p.photo_url as string | null) ?? null,
+      });
     }
 
-    const items = ids.map((id) => ({
-      uid: id,
-      displayName: nameByUid.get(id)?.trim() || null,
-    }));
+    const items = ids.map((id) => {
+      const pr = profileByUid.get(id);
+      return {
+        uid: id,
+        displayName: pr?.displayName?.trim() || null,
+        photoUrl: pr?.photoUrl?.trim() || null,
+      };
+    });
 
     return jsonWithCors({ items });
   } catch (e) {

@@ -6,6 +6,7 @@ import {
   fetchLikeCountsByCommentIds,
   fetchLikedCommentIdsForUser,
 } from "@/lib/comment-like-counts";
+import { checkBannedWords } from "@/lib/validate-banned-words";
 
 const CLASSES = new Set(["us_stock", "kr_stock", "crypto", "commodity"]);
 
@@ -185,6 +186,30 @@ export async function POST(request: Request) {
   }
   if (text.length < 1 || text.length > 2000) {
     return jsonWithCors({ error: "invalid_body_length" }, { status: 400 });
+  }
+  const bannedBody = checkBannedWords(text);
+  if (bannedBody) {
+    return jsonWithCors(
+      {
+        error: "banned_words",
+        field: "body",
+        message: `허용되지 않는 표현이 포함되어 있습니다: ${bannedBody}`,
+      },
+      { status: 400 },
+    );
+  }
+  if (titleOut) {
+    const bannedTitle = checkBannedWords(titleOut);
+    if (bannedTitle) {
+      return jsonWithCors(
+        {
+          error: "banned_words",
+          field: "title",
+          message: `허용되지 않는 표현이 포함되어 있습니다: ${bannedTitle}`,
+        },
+        { status: 400 },
+      );
+    }
   }
   if (parentId !== null && parentId.length === 0) {
     return jsonWithCors({ error: "invalid_parent_id" }, { status: 400 });

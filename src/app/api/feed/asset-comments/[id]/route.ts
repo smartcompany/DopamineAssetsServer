@@ -6,6 +6,7 @@ import {
   fetchLikeCountsByCommentIds,
   fetchLikedCommentIdsForUser,
 } from "@/lib/comment-like-counts";
+import { checkBannedWords } from "@/lib/validate-banned-words";
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
@@ -183,11 +184,36 @@ export async function PATCH(request: Request, ctx: RouteCtx) {
   if (text.length < 1 || text.length > 2000) {
     return jsonWithCors({ error: "invalid_body_length" }, { status: 400 });
   }
+  const bannedBody = checkBannedWords(text);
+  if (bannedBody) {
+    return jsonWithCors(
+      {
+        error: "banned_words",
+        field: "body",
+        message: `허용되지 않는 표현이 포함되어 있습니다: ${bannedBody}`,
+      },
+      { status: 400 },
+    );
+  }
 
   const rawTitle = o["title"];
   const titleRaw = typeof rawTitle === "string" ? rawTitle.trim() : "";
   const titleOut =
     titleRaw.length > 0 ? titleRaw.slice(0, 200) : null;
+
+  if (titleOut) {
+    const bannedTitle = checkBannedWords(titleOut);
+    if (bannedTitle) {
+      return jsonWithCors(
+        {
+          error: "banned_words",
+          field: "title",
+          message: `허용되지 않는 표현이 포함되어 있습니다: ${bannedTitle}`,
+        },
+        { status: 400 },
+      );
+    }
+  }
 
   const rawUrls = o["imageUrls"];
   const imageUrls: string[] = [];

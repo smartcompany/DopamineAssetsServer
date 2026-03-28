@@ -1,6 +1,7 @@
 import { jsonWithCors } from "@/lib/cors";
 import { parseBearerUid } from "@/lib/auth-bearer";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { checkBannedWords } from "@/lib/validate-banned-words";
 
 const MAX_NAME = 80;
 
@@ -39,6 +40,19 @@ export async function PATCH(request: Request) {
       { error: "invalid_display_name", max: MAX_NAME },
       { status: 400 },
     );
+  }
+  if (hasDisplayName) {
+    const banned = checkBannedWords(rawName);
+    if (banned) {
+      return jsonWithCors(
+        {
+          error: "banned_words",
+          field: "displayName",
+          message: `허용되지 않는 표현이 포함되어 있습니다: ${banned}`,
+        },
+        { status: 400 },
+      );
+    }
   }
 
   try {
