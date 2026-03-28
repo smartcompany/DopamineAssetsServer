@@ -39,6 +39,8 @@ type ActivityItem = {
   /** like_received */
   likerUid?: string;
   likerDisplayName?: string | null;
+  /** my_post / my_reply — 신고 등으로 타인에게 비노출 */
+  moderationHiddenFromPublic?: boolean;
 };
 
 const PREVIEW = 160;
@@ -120,7 +122,7 @@ export async function GET(request: Request) {
     const { data: myRoots } = await supabase
       .from("dopamine_asset_comments")
       .select(
-        "id, body, title, image_urls, created_at, asset_symbol, asset_class, author_display_name",
+        "id, body, title, image_urls, created_at, asset_symbol, asset_class, author_display_name, moderation_hidden_at",
       )
       .eq("author_uid", uid)
       .is("parent_id", null)
@@ -186,13 +188,14 @@ export async function GET(request: Request) {
         assetDisplayName: nameMap.get(pk) ?? sym,
         likeCount: likeMap.get(r.id as string) ?? 0,
         replyCount: replyMap.get(r.id as string) ?? 0,
+        moderationHiddenFromPublic: r.moderation_hidden_at != null,
       });
     }
 
     const { data: myReplies } = await supabase
       .from("dopamine_asset_comments")
       .select(
-        "id, body, title, image_urls, created_at, asset_symbol, asset_class, author_display_name",
+        "id, body, title, image_urls, created_at, asset_symbol, asset_class, author_display_name, moderation_hidden_at",
       )
       .eq("author_uid", uid)
       .not("parent_id", "is", null)
@@ -259,6 +262,7 @@ export async function GET(request: Request) {
         assetDisplayName: nameMapReplies.get(pk) ?? sym,
         likeCount: likeReplyMap.get(r.id as string) ?? 0,
         replyCount: replyToReplyMap.get(r.id as string) ?? 0,
+        moderationHiddenFromPublic: r.moderation_hidden_at != null,
       });
     }
 
@@ -267,6 +271,7 @@ export async function GET(request: Request) {
       .select("id")
       .eq("author_uid", uid)
       .is("parent_id", null)
+      .is("moderation_hidden_at", null)
       .limit(200);
 
     const rootIds = (rootRows ?? []).map((x) => x.id as string);
@@ -278,6 +283,7 @@ export async function GET(request: Request) {
         )
         .in("parent_id", rootIds)
         .neq("author_uid", uid)
+        .is("moderation_hidden_at", null)
         .order("created_at", { ascending: false })
         .limit(LIMIT_EACH);
 
@@ -299,6 +305,7 @@ export async function GET(request: Request) {
       .from("dopamine_asset_comments")
       .select("id")
       .eq("author_uid", uid)
+      .is("moderation_hidden_at", null)
       .limit(500);
 
     const mineIds = (myCommentIds ?? []).map((x) => x.id as string);
@@ -318,7 +325,8 @@ export async function GET(request: Request) {
       const { data: cRows } = await supabase
         .from("dopamine_asset_comments")
         .select("id, body, asset_symbol, asset_class")
-        .in("id", commentIds);
+        .in("id", commentIds)
+        .is("moderation_hidden_at", null);
       const cMap = new Map<string, { body: string; asset_symbol: string; asset_class: string }>();
       for (const c of cRows ?? []) {
         cMap.set(c.id as string, {

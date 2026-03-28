@@ -11,27 +11,36 @@ export async function GET(request: Request) {
   try {
     const supabase = getSupabaseAdmin();
 
-    const [{ count: postsCount }, { count: followingCount }, { count: followersCount }] =
-      await Promise.all([
-        supabase
-          .from("dopamine_asset_comments")
-          .select("id", { count: "exact", head: true })
-          .eq("author_uid", uid)
-          .is("parent_id", null),
-        supabase
-          .from("dopamine_user_follows")
-          .select("follower_uid", { count: "exact", head: true })
-          .eq("follower_uid", uid),
-        supabase
-          .from("dopamine_user_follows")
-          .select("following_uid", { count: "exact", head: true })
-          .eq("following_uid", uid),
-      ]);
+    const [
+      { count: postsCount },
+      { count: followingCount },
+      { count: followersCount },
+      { count: blockedCount },
+    ] = await Promise.all([
+      supabase
+        .from("dopamine_asset_comments")
+        .select("id", { count: "exact", head: true })
+        .eq("author_uid", uid)
+        .is("parent_id", null),
+      supabase
+        .from("dopamine_user_follows")
+        .select("follower_uid", { count: "exact", head: true })
+        .eq("follower_uid", uid),
+      supabase
+        .from("dopamine_user_follows")
+        .select("following_uid", { count: "exact", head: true })
+        .eq("following_uid", uid),
+      supabase
+        .from("dopamine_user_blocks")
+        .select("blocked_uid", { count: "exact", head: true })
+        .eq("blocker_uid", uid),
+    ]);
 
     return jsonWithCors({
       postsCount: postsCount ?? 0,
       followingCount: followingCount ?? 0,
       followersCount: followersCount ?? 0,
+      blockedCount: blockedCount ?? 0,
     });
   } catch (e) {
     console.error(e);

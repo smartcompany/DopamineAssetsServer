@@ -21,7 +21,7 @@ export async function GET(_request: Request, ctx: RouteCtx) {
     const { data: row, error } = await supabase
       .from("dopamine_asset_comments")
       .select(
-        "id, parent_id, body, title, image_urls, author_uid, author_display_name, asset_symbol, asset_class, asset_display_name, created_at",
+        "id, parent_id, body, title, image_urls, author_uid, author_display_name, asset_symbol, asset_class, asset_display_name, created_at, moderation_hidden_at",
       )
       .eq("id", id)
       .maybeSingle();
@@ -36,13 +36,19 @@ export async function GET(_request: Request, ctx: RouteCtx) {
     if (!row) {
       return jsonWithCors({ error: "not_found" }, { status: 404 });
     }
+    const authorUidRow = row.author_uid as string;
+    if (row.moderation_hidden_at != null) {
+      if (!viewerUid || viewerUid !== authorUidRow) {
+        return jsonWithCors({ error: "not_found" }, { status: 404 });
+      }
+    }
 
     const likeCounts = await fetchLikeCountsByCommentIds(supabase, [id]);
     const likedSet = viewerUid
       ? await fetchLikedCommentIdsForUser(supabase, [id], viewerUid)
       : new Set<string>();
 
-    const authorUid = row.author_uid as string;
+    const authorUid = authorUidRow;
     let displayNameByUid = new Map<string, string>();
     if (authorUid) {
       const { data: profs } = await supabase
@@ -64,10 +70,20 @@ export async function GET(_request: Request, ctx: RouteCtx) {
     const author_display_name = fromProfile ?? stored;
 
     const item = {
-      ...row,
+      id: row.id,
+      parent_id: row.parent_id,
+      body: row.body,
+      title: row.title,
+      image_urls: row.image_urls,
+      author_uid: row.author_uid,
       author_display_name,
+      asset_symbol: row.asset_symbol,
+      asset_class: row.asset_class,
+      asset_display_name: row.asset_display_name,
+      created_at: row.created_at,
       like_count: likeCounts.get(id) ?? 0,
       liked_by_me: likedSet.has(id),
+      moderation_hidden_from_public: row.moderation_hidden_at != null,
     };
 
     return jsonWithCors({ item });

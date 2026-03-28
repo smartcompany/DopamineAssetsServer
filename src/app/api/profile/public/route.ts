@@ -28,7 +28,8 @@ export async function GET(request: Request) {
         .from("dopamine_asset_comments")
         .select("id", { count: "exact", head: true })
         .eq("author_uid", targetUid)
-        .is("parent_id", null),
+        .is("parent_id", null)
+        .is("moderation_hidden_at", null),
       supabase
         .from("dopamine_user_follows")
         .select("follower_uid", { count: "exact", head: true })

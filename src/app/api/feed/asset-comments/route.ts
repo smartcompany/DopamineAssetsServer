@@ -33,6 +33,7 @@ export async function GET(request: Request) {
       )
       .eq("asset_symbol", symbol)
       .eq("asset_class", assetClass)
+      .is("moderation_hidden_at", null)
       .order("created_at", { ascending: true });
 
     if (error) {

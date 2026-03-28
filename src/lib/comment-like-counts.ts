@@ -62,7 +62,8 @@ export async function fetchReplyCountsByParentIds(
   const { data, error } = await supabase
     .from("dopamine_asset_comments")
     .select("parent_id")
-    .in("parent_id", parentIds);
+    .in("parent_id", parentIds)
+    .is("moderation_hidden_at", null);
 
   if (error) {
     console.error("[reply-counts-by-parent]", error);

@@ -21,6 +21,8 @@ export type CommunityPostRow = {
   reply_count: number;
   like_count: number;
   liked_by_me: boolean;
+  /** 작성자 본인에게만 — 신고 등으로 타인에게 비노출 */
+  moderation_hidden_from_public: boolean;
 };
 
 type Sort = "latest" | "popular";
@@ -40,7 +42,7 @@ export type CommunityPostsFilter = {
 };
 
 const ROOT_SELECT =
-  "id, parent_id, body, title, image_urls, author_uid, author_display_name, created_at, asset_symbol, asset_class, asset_display_name";
+  "id, parent_id, body, title, image_urls, author_uid, author_display_name, created_at, asset_symbol, asset_class, asset_display_name, moderation_hidden_at";
 
 type RootRow = {
   id: string;
@@ -53,7 +55,22 @@ type RootRow = {
   asset_symbol: string;
   asset_class: string;
   asset_display_name: string | null;
+  moderation_hidden_at: string | null;
 };
+
+/** 비로그인: 숨김 제외. 로그인: 숨김 아님 ∪ 내가 쓴 글(숨김 포함) */
+function applyRootModerationOr(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  q: any,
+  viewerUid: string | null | undefined,
+) {
+  if (!viewerUid || viewerUid.length === 0) {
+    return q.is("moderation_hidden_at", null);
+  }
+  return q.or(
+    `moderation_hidden_at.is.null,author_uid.eq.${viewerUid}`,
+  );
+}
 
 function rowMatchesBodyTerms(
   body: string,
@@ -141,6 +158,11 @@ function parseRoot(r: Record<string, unknown>): RootRow {
     asset_symbol: r.asset_symbol as string,
     asset_class: r.asset_class as string,
     asset_display_name: (r.asset_display_name as string | null) ?? null,
+    moderation_hidden_at:
+      typeof r.moderation_hidden_at === "string" &&
+      r.moderation_hidden_at.length > 0
+        ? r.moderation_hidden_at
+        : null,
   };
 }
 
@@ -173,18 +195,24 @@ export async function getCommunityPosts(
 
   if (unionSymbolOrBody) {
     const [aRes, poolRes] = await Promise.all([
-      supabase
-        .from("dopamine_asset_comments")
-        .select(ROOT_SELECT)
-        .is("parent_id", null)
-        .eq("asset_symbol", symbol!)
-        .eq("asset_class", assetClass!)
+      applyRootModerationOr(
+        supabase
+          .from("dopamine_asset_comments")
+          .select(ROOT_SELECT)
+          .is("parent_id", null)
+          .eq("asset_symbol", symbol!)
+          .eq("asset_class", assetClass!),
+        viewerUid,
+      )
         .order("created_at", { ascending: false })
         .limit(poolLimit),
-      supabase
-        .from("dopamine_asset_comments")
-        .select(ROOT_SELECT)
-        .is("parent_id", null)
+      applyRootModerationOr(
+        supabase
+          .from("dopamine_asset_comments")
+          .select(ROOT_SELECT)
+          .is("parent_id", null),
+        viewerUid,
+      )
         .order("created_at", { ascending: false })
         .limit(poolLimit),
     ]);
@@ -198,7 +226,7 @@ export async function getCommunityPosts(
       throw new Error(poolRes.error.message);
     }
 
-    const rootsB = (poolRes.data ?? []).filter((row) =>
+    const rootsB = (poolRes.data ?? []).filter((row: Record<string, unknown>) =>
       rowMatchesBodyTerms(
         row.body as string,
         typeof row.title === "string" ? row.title : null,
@@ -220,10 +248,13 @@ export async function getCommunityPosts(
     );
     skipPostBodyFilter = true;
   } else {
-    let rootsQuery = supabase
-      .from("dopamine_asset_comments")
-      .select(ROOT_SELECT)
-      .is("parent_id", null);
+    let rootsQuery = applyRootModerationOr(
+      supabase
+        .from("dopamine_asset_comments")
+        .select(ROOT_SELECT)
+        .is("parent_id", null),
+      viewerUid,
+    );
 
     if (hasSymbolFilter) {
       rootsQuery = rootsQuery.eq("asset_symbol", symbol!).eq("asset_class", assetClass!);
@@ -242,7 +273,9 @@ export async function getCommunityPosts(
       return [];
     }
 
-    roots = rootsRaw.map((r) => parseRoot(r as Record<string, unknown>));
+    roots = rootsRaw.map((r: Record<string, unknown>) =>
+      parseRoot(r),
+    );
   }
 
   const hiddenAuthorUids = await fetchHiddenAuthorUids(supabase, viewerUid);
@@ -263,7 +296,8 @@ export async function getCommunityPosts(
   const { data: replyRows, error: replyErr } = await supabase
     .from("dopamine_asset_comments")
     .select("parent_id")
-    .in("parent_id", ids);
+    .in("parent_id", ids)
+    .is("moderation_hidden_at", null);
 
   if (replyErr) {
     console.error("[community-posts] reply count", replyErr);
@@ -301,6 +335,7 @@ export async function getCommunityPosts(
       reply_count: counts.get(id) ?? 0,
       like_count: likeCounts.get(id) ?? 0,
       liked_by_me: likedSet.has(id),
+      moderation_hidden_from_public: r.moderation_hidden_at != null,
     };
   });
 
