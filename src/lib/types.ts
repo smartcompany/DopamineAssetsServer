@@ -49,8 +49,14 @@ export type ThemeItemDto = {
 };
 
 export type MarketSummaryDto = {
+  /** 한국어 시장 요약 본문 (지수 흐름 서술) */
+  briefing: string | null;
+  briefingEn: string | null;
+  attribution: string | null;
+  attributionEn: string | null;
   kimchiPremiumPct: number | null;
   usdKrw: number | null;
+  /** @deprecated 호환용 — briefing 사용 */
   marketStatus: string | null;
 };
 

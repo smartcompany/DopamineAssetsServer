@@ -20,6 +20,8 @@ type ActivityItem = {
   kind: ActivityKind;
   at: string;
   commentId: string;
+  /** 커뮤니티 본문 화면용 스레드 루트 글 id (like_received / reply_on_my_post) */
+  threadRootCommentId?: string;
   bodyPreview: string;
   assetSymbol: string;
   assetClass: string;
@@ -50,6 +52,56 @@ function preview(body: string): string {
   const t = body.trim();
   if (t.length <= PREVIEW) return t;
   return `${t.slice(0, PREVIEW)}…`;
+}
+
+/** parent_id 체인을 따라 스레드 루트( parent_id 가 null 인 댓글 ) id */
+async function loadParentClosureAndRootIds(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  initialIds: string[],
+): Promise<Map<string, string>> {
+  const rootById = new Map<string, string>();
+  if (initialIds.length === 0) return rootById;
+
+  const loaded = new Set<string>();
+  const parentById = new Map<string, string | null>();
+  let frontier = new Set(
+    initialIds.filter((id) => typeof id === "string" && id.length > 0),
+  );
+
+  while (frontier.size > 0) {
+    const batch = [...frontier].filter((id) => !loaded.has(id));
+    if (batch.length === 0) break;
+    for (const id of batch) loaded.add(id);
+
+    const { data } = await supabase
+      .from("dopamine_asset_comments")
+      .select("id, parent_id")
+      .in("id", batch);
+
+    const next = new Set<string>();
+    for (const row of data ?? []) {
+      const id = row.id as string;
+      const p = row.parent_id as string | null;
+      parentById.set(id, p && p.length > 0 ? p : null);
+      if (p && p.length > 0 && !loaded.has(p)) next.add(p);
+    }
+    frontier = next;
+  }
+
+  function rootOf(start: string): string {
+    let cur = start;
+    for (let i = 0; i < 100; i++) {
+      const p = parentById.get(cur);
+      if (p == null || p === "") return cur;
+      cur = p;
+    }
+    return start;
+  }
+
+  for (const id of initialIds) {
+    if (id.length > 0) rootById.set(id, rootOf(id));
+  }
+  return rootById;
 }
 
 async function loadProfileNames(
@@ -279,7 +331,7 @@ export async function GET(request: Request) {
       const { data: repliesToMe } = await supabase
         .from("dopamine_asset_comments")
         .select(
-          "id, body, created_at, asset_symbol, asset_class, author_uid, author_display_name",
+          "id, body, created_at, asset_symbol, asset_class, author_uid, author_display_name, parent_id",
         )
         .in("parent_id", rootIds)
         .neq("author_uid", uid)
@@ -288,10 +340,13 @@ export async function GET(request: Request) {
         .limit(LIMIT_EACH);
 
       for (const r of repliesToMe ?? []) {
+        const parentId = r.parent_id as string | null;
         items.push({
           kind: "reply_on_my_post",
           at: r.created_at as string,
           commentId: r.id as string,
+          threadRootCommentId:
+            parentId && parentId.length > 0 ? parentId : undefined,
           bodyPreview: preview(r.body as string),
           assetSymbol: r.asset_symbol as string,
           assetClass: r.asset_class as string,
@@ -336,15 +391,20 @@ export async function GET(request: Request) {
         });
       }
 
+      const likeRootMap = await loadParentClosureAndRootIds(supabase, commentIds);
+
       for (const row of likesIn ?? []) {
         const cid = row.comment_id as string;
         const c = cMap.get(cid);
         if (!c) continue;
         const liker = row.user_uid as string;
+        const threadRoot = likeRootMap.get(cid);
         items.push({
           kind: "like_received",
           at: row.created_at as string,
           commentId: cid,
+          threadRootCommentId:
+            threadRoot && threadRoot.length > 0 ? threadRoot : undefined,
           bodyPreview: preview(c.body),
           assetSymbol: c.asset_symbol,
           assetClass: c.asset_class,

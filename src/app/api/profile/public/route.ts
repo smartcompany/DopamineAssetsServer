@@ -71,9 +71,10 @@ export async function GET(request: Request) {
       blockedByMe = !!b;
     }
 
+    const rawDn = (prof?.display_name as string | null)?.trim();
     return jsonWithCors({
       uid: targetUid,
-      displayName: (prof?.display_name as string | null)?.trim() || "User",
+      displayName: rawDn && rawDn.length > 0 ? rawDn : null,
       photoUrl,
       postsCount: postsCount ?? 0,
       followingCount: followingCount ?? 0,

@@ -83,31 +83,41 @@ function rowMatchesBodyTerms(
   return lower.some((fragment) => blob.includes(fragment));
 }
 
-async function fetchAuthorPhotoUrlsByUid(
+type AuthorProfileLite = {
+  photoByUid: Map<string, string | null>;
+  displayNameByUid: Map<string, string>;
+};
+
+async function fetchAuthorProfilesLite(
   supabase: ReturnType<typeof getSupabaseAdmin>,
   uids: string[],
-): Promise<Map<string, string | null>> {
-  const out = new Map<string, string | null>();
-  if (uids.length === 0) return out;
+): Promise<AuthorProfileLite> {
+  const photoByUid = new Map<string, string | null>();
+  const displayNameByUid = new Map<string, string>();
+  if (uids.length === 0) return { photoByUid, displayNameByUid };
   const uniq = [...new Set(uids)];
   try {
     const { data, error } = await supabase
       .from("dopamine_user_profiles")
-      .select("uid, photo_url")
+      .select("uid, display_name, photo_url")
       .in("uid", uniq);
     if (error) {
-      console.error("[community-posts] profile photo fetch", error);
-      return out;
+      console.error("[community-posts] profile fetch", error);
+      return { photoByUid, displayNameByUid };
     }
     for (const row of data ?? []) {
       const uid = row.uid as string;
       const photoUrl = (row.photo_url as string | null)?.trim() || null;
-      out.set(uid, photoUrl);
+      photoByUid.set(uid, photoUrl);
+      const dn = (row.display_name as string | null)?.trim();
+      if (dn && dn.length > 0) {
+        displayNameByUid.set(uid, dn);
+      }
     }
   } catch (e) {
-    console.error("[community-posts] profile photo fetch", e);
+    console.error("[community-posts] profile fetch", e);
   }
-  return out;
+  return { photoByUid, displayNameByUid };
 }
 
 async function fetchHiddenAuthorUids(
@@ -289,7 +299,10 @@ export async function getCommunityPosts(
   }
 
   const authorUids = [...new Set(roots.map((r) => r.author_uid))];
-  const photoByUid = await fetchAuthorPhotoUrlsByUid(supabase, authorUids);
+  const { photoByUid, displayNameByUid } = await fetchAuthorProfilesLite(
+    supabase,
+    authorUids,
+  );
 
   const ids = roots.map((r) => r.id);
 
@@ -319,15 +332,23 @@ export async function getCommunityPosts(
 
   let enriched: CommunityPostRow[] = roots.map((r) => {
     const id = r.id;
+    const uid = r.author_uid;
+    const fromProfile = displayNameByUid.get(uid);
+    const stored =
+      typeof r.author_display_name === "string" && r.author_display_name.trim().length > 0
+        ? r.author_display_name.trim()
+        : null;
+    const author_display_name =
+      (fromProfile && fromProfile.length > 0 ? fromProfile : null) ?? stored ?? "User";
     return {
       id,
       parent_id: null,
       body: r.body,
       title: r.title,
       image_urls: r.image_urls,
-      author_uid: r.author_uid,
-      author_display_name: r.author_display_name,
-      author_photo_url: photoByUid.get(r.author_uid) ?? null,
+      author_uid: uid,
+      author_display_name,
+      author_photo_url: photoByUid.get(uid) ?? null,
       created_at: r.created_at,
       asset_symbol: r.asset_symbol,
       asset_class: r.asset_class,
