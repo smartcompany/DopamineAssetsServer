@@ -7,6 +7,7 @@ import {
   fetchLikedCommentIdsForUser,
 } from "@/lib/comment-like-counts";
 import { checkBannedWords } from "@/lib/validate-banned-words";
+import { notifyCommentReply } from "@/lib/push-notifications";
 
 const CLASSES = new Set(["us_stock", "kr_stock", "crypto", "commodity", "theme"]);
 
@@ -228,10 +229,13 @@ export async function POST(request: Request) {
       displayName = profileName;
     }
 
+    let parentAuthorUid: string | null = null;
     if (parentId) {
       const { data: parentRow, error: parentErr } = await supabase
         .from("dopamine_asset_comments")
-        .select("id, asset_symbol, asset_class, asset_display_name")
+        .select(
+          "id, asset_symbol, asset_class, asset_display_name, author_uid",
+        )
         .eq("id", parentId)
         .maybeSingle();
 
@@ -240,6 +244,10 @@ export async function POST(request: Request) {
       }
       if (parentRow.asset_symbol !== symbol || parentRow.asset_class !== assetClass) {
         return jsonWithCors({ error: "parent_mismatch" }, { status: 400 });
+      }
+      const pau = (parentRow.author_uid as string | null)?.trim();
+      if (pau && pau.length > 0) {
+        parentAuthorUid = pau;
       }
       if (!assetDisplayName) {
         const pn = (parentRow.asset_display_name as string | null)?.trim();
@@ -273,6 +281,20 @@ export async function POST(request: Request) {
         { error: "supabase_error", detail: insertErr.message },
         { status: 500 },
       );
+    }
+
+    if (parentId && parentAuthorUid) {
+      const newId = inserted.id as string;
+      void notifyCommentReply({
+        recipientUid: parentAuthorUid,
+        actorUid: uid,
+        actorDisplayName: displayName,
+        replyBody: text,
+        symbol,
+        assetClass,
+        parentId,
+        newCommentId: newId,
+      }).catch((e) => console.error("[push] notifyCommentReply", e));
     }
 
     return jsonWithCors({ item: inserted });

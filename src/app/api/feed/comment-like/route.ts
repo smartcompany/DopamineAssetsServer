@@ -1,11 +1,34 @@
 import { jsonWithCors } from "@/lib/cors";
-import { parseBearerUid } from "@/lib/auth-bearer";
+import { verifyFirebaseIdToken } from "@/lib/firebase-admin-app";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { notifyCommentLiked } from "@/lib/push-notifications";
 
 export async function POST(request: Request) {
-  const uid = await parseBearerUid(request);
-  if (!uid) {
+  const authHeader = request.headers.get("authorization")?.trim();
+  const token =
+    authHeader?.toLowerCase().startsWith("bearer ") === true
+      ? authHeader.slice(7).trim()
+      : null;
+  if (!token) {
     return jsonWithCors({ error: "missing_or_invalid_token" }, { status: 401 });
+  }
+
+  let uid: string;
+  let likerDisplayName: string;
+  try {
+    const decoded = await verifyFirebaseIdToken(token);
+    uid = decoded.uid;
+    likerDisplayName =
+      (typeof decoded.name === "string" && decoded.name.length > 0
+        ? decoded.name
+        : null) ??
+      (typeof decoded.email === "string" && decoded.email.length > 0
+        ? decoded.email
+        : null) ??
+      "User";
+  } catch (e) {
+    console.error(e);
+    return jsonWithCors({ error: "invalid_token" }, { status: 401 });
   }
 
   let body: unknown;
@@ -29,7 +52,7 @@ export async function POST(request: Request) {
     const supabase = getSupabaseAdmin();
     const { data: row, error: findErr } = await supabase
       .from("dopamine_asset_comments")
-      .select("id")
+      .select("id, author_uid, asset_symbol, asset_class")
       .eq("id", commentId)
       .maybeSingle();
 
@@ -68,6 +91,29 @@ export async function POST(request: Request) {
           { error: "supabase_error", detail: insErr.message },
           { status: 500 },
         );
+      }
+
+      const authorUid = (row.author_uid as string | null)?.trim() ?? "";
+      const sym = (row.asset_symbol as string | null)?.trim() ?? "";
+      const cls = (row.asset_class as string | null)?.trim() ?? "";
+      if (authorUid.length > 0 && sym.length > 0 && cls.length > 0) {
+        const { data: profRow } = await supabase
+          .from("dopamine_user_profiles")
+          .select("display_name")
+          .eq("uid", uid)
+          .maybeSingle();
+        const profileName = (profRow?.display_name as string | null)?.trim();
+        if (profileName && profileName.length > 0) {
+          likerDisplayName = profileName;
+        }
+        void notifyCommentLiked({
+          recipientUid: authorUid,
+          likerUid: uid,
+          likerDisplayName,
+          commentId,
+          symbol: sym,
+          assetClass: cls,
+        }).catch((e) => console.error("[push] notifyCommentLiked", e));
       }
     }
 
