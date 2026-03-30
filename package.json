@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "refresh-crypto-cache": "tsx scripts/refresh-crypto-feed-cache.ts"
+    "refresh-feed-cache": "tsx scripts/refresh-feed-cache.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",

@@ -21,7 +21,7 @@ export default function Home() {
         </li>
         <li>
           <Link className="underline" href="/api/feed/rankings/up">
-            GET /api/feed/rankings/up (Yahoo 일봉 기반 실데이터)
+            GET /api/feed/rankings/up (Supabase 피드 캐시 — GitHub Actions 갱신)
           </Link>
         </li>
         <li>

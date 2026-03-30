@@ -255,6 +255,26 @@ create index if not exists dopamine_crypto_feed_cache_updated_idx
 
 alter table public.dopamine_crypto_feed_cache enable row level security;
 
+-- ---------------------------------------------------------------------------
+-- 11) 통합 피드 캐시 (GitHub Actions → CoinGecko·Yahoo·네이버 → Supabase)
+-- ---------------------------------------------------------------------------
+create table if not exists public.dopamine_feed_cache (
+  id text primary key,
+  items jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists dopamine_feed_cache_updated_idx
+  on public.dopamine_feed_cache (updated_at desc);
+
+alter table public.dopamine_feed_cache enable row level security;
+
+insert into public.dopamine_feed_cache (id, items, updated_at)
+select 'crypto', items, updated_at
+from public.dopamine_crypto_feed_cache
+where id = 'bybit_spot_usdt'
+on conflict (id) do nothing;
+
 -- =============================================================================
 -- 끝
 -- =============================================================================

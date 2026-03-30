@@ -1,6 +1,7 @@
-# Bybit 스팟 티커 → Supabase `dopamine_crypto_feed_cache` (Vercel은 읽기만).
-# Secrets: repo 또는 Environment `production` — NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_KEY
-name: Crypto feed cache (Bybit → Supabase)
+# CoinGecko·Yahoo·네이버 → Supabase `dopamine_feed_cache` (Vercel API는 읽기만).
+# Secrets (repo 또는 Environment `production`): NEXT_PUBLIC_SUPABASE_URL,
+#   SUPABASE_SERVICE_ROLE_KEY (또는 upsert 가능한 키를 NEXT_PUBLIC_SUPABASE_KEY 로)
+name: Feed cache refresh
 
 on:
   schedule:
@@ -17,10 +18,10 @@ jobs:
         with:
           node-version: "20"
           cache: npm
-          # 저장소 루트 = 이 server 레포 루트 (상위 DopamineAssets/server 가 아님)
           cache-dependency-path: package-lock.json
-      - name: Install & refresh cache
+      - name: Install & refresh feed cache
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_KEY }}
-        run: npm ci && npm run refresh-crypto-cache
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npm ci && npm run refresh-feed-cache
