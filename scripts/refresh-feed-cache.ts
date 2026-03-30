@@ -54,7 +54,9 @@ async function main() {
   };
 
   console.log("[refresh-feed-cache] crypto (CoinGecko)…");
-  const cryptoRows = await fetchCoinGeckoMarketRowsForCache();
+  const cryptoRows = await fetchCoinGeckoMarketRowsForCache({
+    maxPages: 1,
+  });
   await upsert(FEED_CACHE_ID.crypto, cryptoRows);
 
   console.log("[refresh-feed-cache] kr_stock (Naver)…");
