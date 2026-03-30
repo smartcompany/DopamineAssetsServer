@@ -241,6 +241,20 @@ create index if not exists dopamine_market_daily_push_sent_day_idx
 
 alter table public.dopamine_market_daily_push_sent enable row level security;
 
+-- ---------------------------------------------------------------------------
+-- 10) 코인 랭킹 캐시 (GitHub Actions → Bybit → Supabase, Vercel은 읽기만)
+-- ---------------------------------------------------------------------------
+create table if not exists public.dopamine_crypto_feed_cache (
+  id text primary key,
+  items jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists dopamine_crypto_feed_cache_updated_idx
+  on public.dopamine_crypto_feed_cache (updated_at desc);
+
+alter table public.dopamine_crypto_feed_cache enable row level security;
+
 -- =============================================================================
 -- 끝
 -- =============================================================================

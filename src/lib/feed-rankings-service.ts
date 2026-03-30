@@ -1,4 +1,4 @@
-import { fetchBinanceSpotUsdtTickerRows } from "./binance-spot";
+import { fetchCachedCryptoRowsFromSupabase } from "./crypto-feed-cache";
 import { FEED_UNIVERSE } from "./feed-universe";
 import { fetchKrStockRowsFromNaver } from "./kr-stock";
 import { computeChangeFromDailyBars, dopamineScore } from "./feed-metrics";
@@ -118,7 +118,7 @@ export async function getFeedRankings(
       rows = await fetchYahooDayMovers(kind, limit);
     }
     if (classes.has("crypto")) {
-      const cryptoRows = await fetchBinanceSpotUsdtTickerRows();
+      const { rows: cryptoRows } = await fetchCachedCryptoRowsFromSupabase();
       rows = [...rows, ...cryptoRows];
     }
     if (classes.has("kr_stock")) {
@@ -140,7 +140,7 @@ export async function getFeedRankings(
       yahooParts.push("yahoo_predefined_screener_intraday_pct_est_for_us_equity");
     }
     if (classes.has("crypto")) {
-      yahooParts.push("binance_spot_usdt_24hr_ticker_priceChangePercent");
+      yahooParts.push("supabase_cached_bybit_spot_all_pairs_price24hPcnt");
     }
     if (classes.has("kr_stock")) {
       yahooParts.push("naver_finance_sise_rise_fall_html_crawl_for_kr_stock");
@@ -163,7 +163,7 @@ export async function getFeedRankings(
       await sleep(75);
     }
     if (classes.has("crypto")) {
-      const cryptoRows = await fetchBinanceSpotUsdtTickerRows();
+      const { rows: cryptoRows } = await fetchCachedCryptoRowsFromSupabase();
       rows = [...rows, ...cryptoRows];
     }
     if (classes.has("kr_stock")) {
@@ -172,7 +172,7 @@ export async function getFeedRankings(
     }
     const uniParts: string[] = [];
     if (classes.has("crypto")) {
-      uniParts.push("binance_spot_usdt_24hr_ticker_priceChangePercent");
+      uniParts.push("supabase_cached_bybit_spot_all_pairs_price24hPcnt");
     }
     if (classes.has("kr_stock")) {
       uniParts.push("naver_finance_sise_rise_fall_html_crawl_for_kr_stock");
