@@ -1,11 +1,14 @@
 import { fetchMoveSummaryKo } from "./asset-move-summary-batch";
-import { fetchBybitSpotInstrumentDetail } from "./bybit-instrument-detail";
 import { THEME_DEFINITIONS } from "./theme-definitions";
 import type { AssetClass, AssetDetailDto, CommodityKind } from "./types";
 import { fetchYahooQuoteSummary } from "./yahoo-quote-summary";
 
 function cryptoSymbolToYahooUsd(symbol: string): string | null {
-  const u = symbol.toUpperCase().trim();
+  const t = symbol.trim();
+  if (/^[A-Za-z0-9]+-USD$/i.test(t)) {
+    return t.toUpperCase();
+  }
+  const u = t.toUpperCase();
   if (u.endsWith("USDT")) {
     const base = u.slice(0, -4);
     if (base.length === 0) return null;
@@ -17,6 +20,17 @@ function cryptoSymbolToYahooUsd(symbol: string): string | null {
     return `${base}-USD`;
   }
   return null;
+}
+
+/** Bybit 대체: `BTCUSDT` 등에서 베이스/쿼트 추정 (Vercel에서 Bybit 403 회피). */
+function parseCryptoPairFromRankingSymbol(symbol: string): {
+  base: string;
+  quote: string;
+} | null {
+  const u = symbol.toUpperCase().trim();
+  const m = u.match(/^([A-Z0-9]{1,20})(USDT|USDC)$/);
+  if (!m) return null;
+  return { base: m[1], quote: m[2] };
 }
 
 /**
@@ -75,15 +89,11 @@ export async function getAssetDetail(params: {
   let baseCurrency: string | null = null;
   let quoteCurrency: string | null = null;
   if (assetClass === "crypto") {
-    try {
-      const bi = await fetchBybitSpotInstrumentDetail(symbol);
-      if (bi) {
-        baseCurrency = bi.baseCoin;
-        quoteCurrency = bi.quoteCoin;
-        dataSources.push("bybit_spot_instruments_info");
-      }
-    } catch (e) {
-      console.error("[asset-detail] Bybit failed", symbol, e);
+    const pair = parseCryptoPairFromRankingSymbol(symbol);
+    if (pair) {
+      baseCurrency = pair.base;
+      quoteCurrency = pair.quote;
+      dataSources.push("symbol_parse_crypto_pair");
     }
   }
 

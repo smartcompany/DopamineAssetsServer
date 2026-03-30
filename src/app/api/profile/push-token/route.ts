@@ -45,12 +45,13 @@ export async function POST(request: Request) {
       { onConflict: "uid,fcm_token" },
     );
     if (error) {
-      console.error(error);
+      console.error("[push-token] supabase upsert failed", error);
       return jsonWithCors(
         { error: "supabase_error", detail: error.message },
         { status: 500 },
       );
     }
+    console.log("[push-token] ok", uid.slice(0, 8), platform);
     return jsonWithCors({ ok: true });
   } catch (e) {
     console.error(e);
