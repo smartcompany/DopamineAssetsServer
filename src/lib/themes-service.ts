@@ -1,5 +1,6 @@
 import { computeChangeFromDailyBars } from "./feed-metrics";
 import { inferAssetClassForThemeSymbol } from "./theme-community-pairs";
+import { getSupabaseAdmin } from "./supabase-admin";
 import {
   THEME_DEFINITIONS,
   themeDisplayName,
@@ -8,8 +9,9 @@ import {
 } from "./theme-definitions";
 import type { AssetClass, ThemeItemDto } from "./types";
 import { fetchYahooDailyBars } from "./yahoo-chart";
+import { THEME_CACHE_ID } from "./theme-cache-constants";
 
-const CACHE_TTL_MS = 90_000;
+const CACHE_TTL_MS = 60_000;
 const MAX_ITEMS_PER_KIND = 15;
 const YAHOO_BAR_DAYS = 12;
 const SYMBOL_FETCH_CONCURRENCY = 5;
@@ -104,7 +106,7 @@ async function aggregateTheme(def: ThemeDefinition): Promise<ThemeComputedRow | 
   };
 }
 
-async function computeAllThemes(): Promise<ThemeComputedRow[]> {
+export async function computeAllThemesRows(): Promise<ThemeComputedRow[]> {
   const out: ThemeComputedRow[] = [];
   for (const def of THEME_DEFINITIONS) {
     const row = await aggregateTheme(def);
@@ -154,8 +156,31 @@ export async function getThemes(
   const now = Date.now();
   if (!cache || now - cache.at > CACHE_TTL_MS) {
     try {
-      const rows = await computeAllThemes();
-      cache = { at: now, rows };
+      const supabase = getSupabaseAdmin();
+      const { data, error } = await supabase
+        .from("dopamine_theme_cache")
+        .select("items, updated_at")
+        .eq("id", THEME_CACHE_ID)
+        .maybeSingle();
+
+      if (!error && data?.items && Array.isArray(data.items)) {
+        cache = { at: now, rows: data.items as ThemeComputedRow[] };
+      } else {
+        const rows = await computeAllThemesRows();
+        cache = { at: now, rows };
+
+        // best-effort: 백그라운드 잡이 실패했을 때도 다음 호출에 부담이 덜 가도록 저장
+        try {
+          await supabase.from("dopamine_theme_cache").upsert(
+            {
+              id: THEME_CACHE_ID,
+              items: rows,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "id" },
+          );
+        } catch {}
+      }
     } catch (e) {
       console.error("[themes] computeAllThemes failed", e);
       return { kind, locale, items: [] };

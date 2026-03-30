@@ -67,7 +67,7 @@ export async function getAssetDetail(params: {
   const dataSources: string[] = [];
   const asOf = new Date().toISOString();
 
-  let yahooSym = resolveYahooSymbol(assetClass, symbol);
+  const yahooSym = resolveYahooSymbol(assetClass, symbol);
   console.log("[asset-detail] request", {
     symbol,
     assetClass,

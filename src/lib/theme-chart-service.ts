@@ -1,5 +1,7 @@
 import { THEME_DEFINITIONS } from "./theme-definitions";
 import { fetchYahooOhlcBars, type OhlcBar } from "./yahoo-chart";
+import { getSupabaseAdmin } from "./supabase-admin";
+import { themeChartCacheId } from "./theme-cache-constants";
 
 function dayKeyUtc(t: number): string {
   return new Date(t * 1000).toISOString().slice(0, 10);
@@ -36,6 +38,22 @@ export async function getThemeAverageOhlcBars(
   themeId: string,
   rangeDays: number,
 ): Promise<OhlcBar[]> {
+  const cacheId = themeChartCacheId(themeId, rangeDays);
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data } = await supabase
+      .from("dopamine_theme_chart_cache")
+      .select("items")
+      .eq("id", cacheId)
+      .maybeSingle();
+    if (data?.items && Array.isArray(data.items)) {
+      return data.items as OhlcBar[];
+    }
+  } catch (e) {
+    // 캐시 조회 실패해도 차트 계산은 계속 진행 (요청 UX 우선)
+    console.error("[theme-chart-cache] read failed", e);
+  }
+
   const def = THEME_DEFINITIONS.find((d) => d.id === themeId);
   if (!def) return [];
 
@@ -73,5 +91,19 @@ export async function getThemeAverageOhlcBars(
     const t = Math.floor(new Date(`${d}T12:00:00.000Z`).getTime() / 1000);
     out.push({ t, o: avg, h: avg, l: avg, c: avg, v: 0 });
   }
+
+  // best-effort: 캐시 저장
+  try {
+    const supabase = getSupabaseAdmin();
+    await supabase.from("dopamine_theme_chart_cache").upsert(
+      {
+        id: cacheId,
+        items: out,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "id" },
+    );
+  } catch {}
+
   return out;
 }

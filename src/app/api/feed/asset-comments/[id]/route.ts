@@ -50,7 +50,7 @@ export async function GET(_request: Request, ctx: RouteCtx) {
       : new Set<string>();
 
     const authorUid = authorUidRow;
-    let displayNameByUid = new Map<string, string>();
+    const displayNameByUid = new Map<string, string>();
     if (authorUid) {
       const { data: profs } = await supabase
         .from("dopamine_user_profiles")

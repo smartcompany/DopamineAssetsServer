@@ -2,7 +2,7 @@
  * GitHub Actions: CoinGecko·Yahoo·네이버 → Supabase `dopamine_feed_cache` upsert.
  * 사용: cd server && npm run refresh-feed-cache
  *
- * env: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_KEY 또는 SUPABASE_SERVICE_ROLE_KEY
+ * env: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_KEY
  */
 import { createClient } from "@supabase/supabase-js";
 
@@ -12,7 +12,11 @@ import { buildRankedRowFromYahooDaily } from "../src/lib/feed-rankings-row";
 import { FEED_UNIVERSE } from "../src/lib/feed-universe";
 import { fetchKrStockRowsFromNaver } from "../src/lib/kr-stock";
 import { fetchYahooDayMovers } from "../src/lib/yahoo-screener";
+import { computeAllThemesRows } from "../src/lib/themes-service";
+import { THEME_DEFINITIONS } from "../src/lib/theme-definitions";
+import { getThemeAverageOhlcBars } from "../src/lib/theme-chart-service";
 import type { RankedAssetDto } from "../src/lib/types";
+import { THEME_CACHE_ID } from "../src/lib/theme-cache-constants";
 
 async function sleep(ms: number): Promise<void> {
   await new Promise((r) => setTimeout(r, ms));
@@ -20,12 +24,10 @@ async function sleep(ms: number): Promise<void> {
 
 async function main() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
-    process.env.NEXT_PUBLIC_SUPABASE_KEY?.trim();
+  const key = process.env.NEXT_PUBLIC_SUPABASE_KEY?.trim();
   if (!url || !key) {
     console.error(
-      "Missing NEXT_PUBLIC_SUPABASE_URL and (SUPABASE_SERVICE_ROLE_KEY or NEXT_PUBLIC_SUPABASE_KEY)",
+      "Missing NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_KEY",
     );
     process.exit(1);
   }
@@ -95,6 +97,33 @@ async function main() {
     await sleep(75);
   }
   await upsert(FEED_CACHE_ID.commodity, commodityRows);
+
+  console.log("[refresh-feed-cache] themes (Yahoo daily)…");
+  const themeRows = await computeAllThemesRows();
+  const themeUpdatedAt = new Date().toISOString();
+  const { error: themeUpsertError } = await supabase
+    .from("dopamine_theme_cache")
+    .upsert(
+      {
+        id: THEME_CACHE_ID,
+        items: themeRows,
+        updated_at: themeUpdatedAt,
+      },
+      { onConflict: "id" },
+    );
+  if (themeUpsertError) {
+    console.error("[refresh-feed-cache] theme upsert failed", themeUpsertError);
+    process.exit(1);
+  }
+
+  console.log("[refresh-feed-cache] theme charts 3mo (Yahoo OHLC)…");
+  // UI 기본이 '3mo'이므로, 먼저 3mo만 워밍업.
+  // (1mo/1y는 요청 시 캐시가 생길 때까지 on-demand 계산될 수 있음)
+  const RANGE_DAYS_3MO = 92;
+  for (const def of THEME_DEFINITIONS) {
+    await getThemeAverageOhlcBars(def.id, RANGE_DAYS_3MO);
+    await sleep(200);
+  }
 
   console.log("[refresh-feed-cache] done");
 }
