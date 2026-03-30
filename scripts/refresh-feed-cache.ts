@@ -22,6 +22,31 @@ async function sleep(ms: number): Promise<void> {
   await new Promise((r) => setTimeout(r, ms));
 }
 
+const STORE_GAINERS_N = 50;
+const STORE_LOSERS_N = 50;
+
+function pickGainersLosersForStore(rows: RankedAssetDto[]): RankedAssetDto[] {
+  const gainers = rows
+    .filter((r) => r.priceChangePct > 0)
+    .sort((a, b) => {
+      const d = b.priceChangePct - a.priceChangePct;
+      if (d !== 0) return d;
+      return b.dopamineScore - a.dopamineScore;
+    })
+    .slice(0, STORE_GAINERS_N);
+
+  const losers = rows
+    .filter((r) => r.priceChangePct < 0)
+    .sort((a, b) => {
+      const d = a.priceChangePct - b.priceChangePct; // more negative first
+      if (d !== 0) return d;
+      return b.dopamineScore - a.dopamineScore;
+    })
+    .slice(0, STORE_LOSERS_N);
+
+  return [...gainers, ...losers];
+}
+
 async function main() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const key = process.env.NEXT_PUBLIC_SUPABASE_KEY?.trim();
@@ -57,11 +82,19 @@ async function main() {
   const cryptoRows = await fetchCoinGeckoMarketRowsForCache({
     maxPages: 1,
   });
-  await upsert(FEED_CACHE_ID.crypto, cryptoRows);
+  const cryptoStore = pickGainersLosersForStore(cryptoRows);
+  console.log(
+    `[refresh-feed-cache] crypto store pre=${cryptoRows.length} store=${cryptoStore.length}`,
+  );
+  await upsert(FEED_CACHE_ID.crypto, cryptoStore);
 
   console.log("[refresh-feed-cache] kr_stock (Naver)…");
   const krRows = await fetchKrStockRowsFromNaver();
-  await upsert(FEED_CACHE_ID.kr_stock, krRows);
+  const krStore = pickGainersLosersForStore(krRows);
+  console.log(
+    `[refresh-feed-cache] kr_stock store pre=${krRows.length} store=${krStore.length}`,
+  );
+  await upsert(FEED_CACHE_ID.kr_stock, krStore);
 
   console.log("[refresh-feed-cache] us_screener (Yahoo)…");
   const gainers = await fetchYahooDayMovers("gainers", 50);
@@ -76,7 +109,12 @@ async function main() {
       bySym.set(r.symbol, r);
     }
   }
-  await upsert(FEED_CACHE_ID.us_screener, [...bySym.values()]);
+  const usScreenerRows = [...bySym.values()];
+  const usScreenerStore = pickGainersLosersForStore(usScreenerRows);
+  console.log(
+    `[refresh-feed-cache] us_screener store pre=${usScreenerRows.length} store=${usScreenerStore.length}`,
+  );
+  await upsert(FEED_CACHE_ID.us_screener, usScreenerStore);
 
   console.log("[refresh-feed-cache] us_universe (Yahoo daily)…");
   const usEntries = FEED_UNIVERSE.filter((e) => e.assetClass === "us_stock");
@@ -86,7 +124,11 @@ async function main() {
     if (row) usUniverseRows.push(row);
     await sleep(75);
   }
-  await upsert(FEED_CACHE_ID.us_universe, usUniverseRows);
+  const usUniverseStore = pickGainersLosersForStore(usUniverseRows);
+  console.log(
+    `[refresh-feed-cache] us_universe store pre=${usUniverseRows.length} store=${usUniverseStore.length}`,
+  );
+  await upsert(FEED_CACHE_ID.us_universe, usUniverseStore);
 
   console.log("[refresh-feed-cache] commodity (Yahoo daily)…");
   const commodityEntries = FEED_UNIVERSE.filter(
@@ -98,7 +140,11 @@ async function main() {
     if (row) commodityRows.push(row);
     await sleep(75);
   }
-  await upsert(FEED_CACHE_ID.commodity, commodityRows);
+  const commodityStore = pickGainersLosersForStore(commodityRows);
+  console.log(
+    `[refresh-feed-cache] commodity store pre=${commodityRows.length} store=${commodityStore.length}`,
+  );
+  await upsert(FEED_CACHE_ID.commodity, commodityStore);
 
   console.log("[refresh-feed-cache] themes (Yahoo daily)…");
   const themeRows = await computeAllThemesRows();
