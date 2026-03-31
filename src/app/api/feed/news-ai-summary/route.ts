@@ -45,15 +45,14 @@ export async function POST(request: Request) {
 
     const outputLanguage = locale.startsWith("en") ? "영어" : "한국어";
     const prompt = `당신은 투자 뉴스 요약 어시스턴트입니다.
-아래 URL 목록과 종목 메타 정보만 보고 요약하세요.
-중요: URL 원문을 크롤링하거나 본문을 읽었다고 가정하지 마세요.
-모르는 내용은 추측하지 말고 반드시 "URL 기반 추정"이라고 명시하세요.
+아래 URL 목록과 종목 메타 정보를 바탕으로 요약하세요.
+경제 기자의 관점에서 의견을 남겨 주세요.
 응답 언어는 반드시 ${outputLanguage}로 작성하세요.
 
 [출력 형식]
 반드시 JSON 하나만 출력:
 {
-  "summary": "2~4문장 요약(첫 문장에 'URL 기반 추정' 포함)",
+  "summary": "3~5문장 핵심 요약",
   "impact": ["주가/가격 영향 포인트 최대 3개"],
   "risk": ["리스크/불확실성 최대 2개"]
 }

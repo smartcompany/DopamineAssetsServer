@@ -1,0 +1,24 @@
+{
+  "ios_ads": [
+    { "rewarded_test": 5 },
+    { "rewarded_test": 1 }
+  ],
+  "android_ads": [
+    { "rewarded_test": 5 },
+    { "rewarded_test": 1 }
+  ],
+  "ref": {
+    "ios": {
+      "rewarded_ad": "ca-app-pub-5520596727761259/3786642276",
+      "rewarded_test": "ca-app-pub-3940256099942544/1712485313",
+      "initial_ad": "ca-app-pub-5520596727761259/4588988406"
+    },
+    "android": {
+      "rewarded_ad": "ca-app-pub-5520596727761259/3491128803",
+      "rewarded_test": "ca-app-pub-3940256099942544/5224354917",
+      "initial_ad": "ca-app-pub-5520596727761259/8504182682"
+    }
+  },
+  "down_load_url": ""
+}
+
