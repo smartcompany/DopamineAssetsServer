@@ -91,10 +91,11 @@ export async function GET(request: Request, ctx: RouteCtx) {
 
     const authorUids = [...new Set(rows.map((r) => r.author_uid as string))];
     const displayNameByUid = new Map<string, string>();
+    const photoByUid = new Map<string, string | null>();
     if (authorUids.length > 0) {
       const { data: profs, error: profErr } = await supabase
         .from("dopamine_user_profiles")
-        .select("uid, display_name")
+        .select("uid, display_name, photo_url")
         .in("uid", authorUids);
       if (profErr) {
         console.error(profErr);
@@ -105,6 +106,8 @@ export async function GET(request: Request, ctx: RouteCtx) {
           if (dn && dn.length > 0) {
             displayNameByUid.set(uid, dn);
           }
+          const ph = (p.photo_url as string | null)?.trim();
+          photoByUid.set(uid, ph && ph.length > 0 ? ph : null);
         }
       }
     }
@@ -132,6 +135,7 @@ export async function GET(request: Request, ctx: RouteCtx) {
           ? rawStored.trim()
           : "User";
       const author_display_name = fromProfile ?? stored;
+      const author_photo_url = photoByUid.get(uid) ?? null;
       return {
         id: r.id,
         parent_id: r.parent_id,
@@ -144,6 +148,7 @@ export async function GET(request: Request, ctx: RouteCtx) {
         asset_symbol: sym,
         asset_class: cls,
         author_display_name,
+        author_photo_url,
         like_count: likeCounts.get(id) ?? 0,
         liked_by_me: likedSet.has(id),
         moderation_hidden_from_public: rootHidden && id === rootId,

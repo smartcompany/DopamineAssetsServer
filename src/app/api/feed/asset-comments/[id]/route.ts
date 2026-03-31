@@ -51,16 +51,19 @@ export async function GET(_request: Request, ctx: RouteCtx) {
 
     const authorUid = authorUidRow;
     const displayNameByUid = new Map<string, string>();
+    let authorPhotoUrl: string | null = null;
     if (authorUid) {
       const { data: profs } = await supabase
         .from("dopamine_user_profiles")
-        .select("uid, display_name")
+        .select("uid, display_name, photo_url")
         .eq("uid", authorUid)
         .maybeSingle();
       const dn = (profs?.display_name as string | null)?.trim();
       if (dn && dn.length > 0) {
         displayNameByUid.set(authorUid, dn);
       }
+      const ph = (profs?.photo_url as string | null)?.trim();
+      authorPhotoUrl = ph && ph.length > 0 ? ph : null;
     }
     const fromProfile = displayNameByUid.get(authorUid);
     const rawStored = row.author_display_name;
@@ -78,6 +81,7 @@ export async function GET(_request: Request, ctx: RouteCtx) {
       image_urls: row.image_urls,
       author_uid: row.author_uid,
       author_display_name,
+      author_photo_url: authorPhotoUrl,
       asset_symbol: row.asset_symbol,
       asset_class: row.asset_class,
       asset_display_name: row.asset_display_name,
