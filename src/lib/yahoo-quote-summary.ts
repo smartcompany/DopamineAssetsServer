@@ -1,7 +1,5 @@
-import { BROWSER_UA, getYahooCrumbSession } from "./yahoo-session";
-
-const MODULES =
-  "assetProfile,summaryProfile,summaryDetail,price,defaultKeyStatistics,quoteType";
+import YahooFinance from "yahoo-finance2";
+import type { QuoteSummaryResult } from "yahoo-finance2/modules/quoteSummary-iface";
 
 export type YahooQuoteSummaryDetail = {
   displayName: string;
@@ -14,11 +12,23 @@ export type YahooQuoteSummaryDetail = {
   website: string | null;
 };
 
-type QuoteValue = { raw?: number; fmt?: string; longFmt?: string };
+/** 미국·한국 주식·원자재 등 quoteSummary 필요 시 — 크럼/쿠키는 yahoo-finance2 가 처리 */
+const MODULES = [
+  "assetProfile",
+  "summaryProfile",
+  "summaryDetail",
+  "price",
+  "defaultKeyStatistics",
+  "quoteType",
+] as const;
 
-function pickFmt(v: QuoteValue | undefined): string | null {
-  if (!v) return null;
-  return v.fmt ?? v.longFmt ?? null;
+let client: InstanceType<typeof YahooFinance> | null = null;
+
+function getYahooFinance(): InstanceType<typeof YahooFinance> {
+  if (!client) {
+    client = new YahooFinance();
+  }
+  return client;
 }
 
 function pickText(v: unknown): string | null {
@@ -26,105 +36,86 @@ function pickText(v: unknown): string | null {
   return null;
 }
 
-/**
- * Yahoo Finance v10 quoteSummary (비공식). 시세·프로필·시가총액 등.
- */
-export async function fetchYahooQuoteSummary(
-  symbol: string,
-): Promise<YahooQuoteSummaryDetail | null> {
-  const enc = encodeURIComponent(symbol);
-  const session = await getYahooCrumbSession();
-
-  const u = new URL(
-    `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${enc}`,
-  );
-  u.searchParams.set("modules", MODULES);
-  if (session?.crumb) {
-    u.searchParams.set("crumb", session.crumb);
+function formatMarketCap(n: number, currencyCode: string): string {
+  const code =
+    typeof currencyCode === "string" && /^[A-Za-z]{3}$/.test(currencyCode)
+      ? currencyCode.toUpperCase()
+      : "USD";
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: code,
+      notation: "compact",
+      maximumFractionDigits: 2,
+    }).format(n);
+  } catch {
+    return String(n);
   }
+}
 
-  const headers: HeadersInit = {
-    Accept: "application/json",
-    "User-Agent": BROWSER_UA,
-    ...(session?.cookie ? { Cookie: session.cookie } : {}),
-  };
-
-  const response = await fetch(u.toString(), { headers });
-  if (!response.ok) {
-    const t = await response.text().catch(() => "");
-    throw new Error(`Yahoo quoteSummary HTTP ${response.status}: ${t.slice(0, 160)}`);
-  }
-
-  const data: unknown = await response.json();
-  const root = data as {
-    quoteSummary?: { result?: unknown[]; error?: unknown };
-    finance?: { result?: unknown[]; error?: unknown };
-  };
-  const qs = root.quoteSummary ?? root.finance;
-  if (process.env.NODE_ENV !== "production" || process.env.DEBUG_YAHOO === "1") {
-    console.log(
-      `[yahoo-quote-summary] ${symbol} resultCount=${qs?.result?.length ?? 0}`,
-    );
-    if (qs?.error) {
-      console.log(`[yahoo-quote-summary] ${symbol} error:`, JSON.stringify(qs.error));
-    }
-  }
-  const result = qs?.result?.[0] as
-    | {
-        summaryProfile?: { sector?: string; industry?: string; longBusinessSummary?: string };
-        assetProfile?: {
-          sector?: string;
-          industry?: string;
-          longBusinessSummary?: string;
-          website?: string;
-        };
-        summaryDetail?: { marketCap?: QuoteValue };
-        defaultKeyStatistics?: { marketCap?: QuoteValue };
-        price?: {
-          longName?: string;
-          shortName?: string;
-          exchangeName?: string;
-          currency?: string;
-        };
-      }
-    | undefined;
-
-  if (!result) {
-    if (process.env.NODE_ENV !== "production" || process.env.DEBUG_YAHOO === "1") {
-      console.log(`[yahoo-quote-summary] ${symbol} no result[0] (empty or missing)`);
-    }
-    return null;
-  }
-
-  const sp = result.summaryProfile;
-  const ap = result.assetProfile;
-  const pr = result.price;
+function mapResult(symbol: string, r: QuoteSummaryResult): YahooQuoteSummaryDetail {
+  const sp = r.summaryProfile;
+  const ap = r.assetProfile;
+  const pr = r.price;
+  const sd = r.summaryDetail;
 
   const sector = pickText(sp?.sector) ?? pickText(ap?.sector);
   const industry = pickText(sp?.industry) ?? pickText(ap?.industry);
   const description =
     pickText(sp?.longBusinessSummary) ?? pickText(ap?.longBusinessSummary);
-  const website = pickText(ap?.website);
+  const website = pickText(ap?.website) ?? pickText(sp?.website);
 
+  const currency =
+    pickText(pr?.currency) ?? (typeof sd?.currency === "string" ? sd.currency : null);
+
+  const mcRaw = sd?.marketCap ?? pr?.marketCap;
   const marketCapFmt =
-    pickFmt(result.summaryDetail?.marketCap) ??
-    pickFmt(result.defaultKeyStatistics?.marketCap);
+    typeof mcRaw === "number" && Number.isFinite(mcRaw) && mcRaw > 0
+      ? formatMarketCap(mcRaw, currency ?? "USD")
+      : null;
 
   const displayName =
-    pickText(pr?.longName) ?? pickText(pr?.shortName) ?? symbol;
+    pickText(pr?.longName) ??
+    pickText(pr?.shortName) ??
+    pickText(ap?.name) ??
+    symbol;
 
-  const out = {
+  return {
     displayName,
     sector,
     industry,
     marketCapFmt,
-    exchange: pickText(pr?.exchangeName),
-    currency: pickText(pr?.currency),
+    exchange: pickText(pr?.exchangeName) ?? pickText(pr?.exchange),
+    currency,
     description,
     website,
   };
-  if (process.env.NODE_ENV !== "production" || process.env.DEBUG_YAHOO === "1") {
-    console.log(`[yahoo-quote-summary] ${symbol} parsed:`, JSON.stringify(out));
+}
+
+/**
+ * Yahoo `quoteSummary` — [yahoo-finance2](https://github.com/gadicc/yahoo-finance2) 사용
+ * (UA·crumb·쿠키·Origin/Referer 를 라이브러리 기본값과 동일하게 맞춤)
+ */
+export async function fetchYahooQuoteSummary(
+  symbol: string,
+): Promise<YahooQuoteSummaryDetail | null> {
+  const sym = symbol.trim();
+  if (!sym) return null;
+
+  try {
+    const yf = getYahooFinance();
+    const result = await yf.quoteSummary(sym, { modules: [...MODULES] });
+    if (!result || typeof result !== "object") {
+      return null;
+    }
+    const out = mapResult(sym, result as QuoteSummaryResult);
+    if (process.env.NODE_ENV !== "production" || process.env.DEBUG_YAHOO === "1") {
+      console.log(`[yahoo-quote-summary] ${sym} parsed:`, JSON.stringify(out));
+    }
+    return out;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn(`[yahoo-quote-summary] ${sym} failed: ${msg.slice(0, 200)}`);
+    return null;
   }
-  return out;
 }
