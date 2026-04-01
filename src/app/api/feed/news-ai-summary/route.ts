@@ -1,12 +1,18 @@
 import OpenAI from "openai";
 import { jsonWithCors } from "@/lib/cors";
 import { openAIChatConfig } from "@/lib/openai-config";
+import {
+  buildCacheKey,
+  canonicalizeNewsUrls,
+  getCachedNewsAiSummary,
+  saveCachedNewsAiSummary,
+} from "@/lib/news-ai-summary-cache";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY ?? "",
 });
 
-const MAX_URLS = 5;
+const SHA256_HEX = /^[a-f0-9]{64}$/i;
 
 export async function POST(request: Request) {
   try {
@@ -18,13 +24,16 @@ export async function POST(request: Request) {
           .map((v) => v.trim())
           .filter((v) => v.length > 0)
       : [];
-    const urls = [...(singleUrl ? [singleUrl] : []), ...rawUrls]
-      .filter((v, i, arr) => arr.indexOf(v) === i)
-      .slice(0, MAX_URLS);
+    const rawList = [...(singleUrl ? [singleUrl] : []), ...rawUrls]
+      .filter((v, i, arr) => arr.indexOf(v) === i);
+    const urls = canonicalizeNewsUrls(rawList);
     const locale = typeof body.locale === "string" ? body.locale.trim().toLowerCase() : "";
     const symbol = typeof body.symbol === "string" ? body.symbol.trim() : "";
     const assetClass = typeof body.assetClass === "string" ? body.assetClass.trim() : "";
     const assetName = typeof body.assetName === "string" ? body.assetName.trim() : "";
+    const titleDigestRaw =
+      typeof body.titleDigest === "string" ? body.titleDigest.trim().toLowerCase() : "";
+    const titleDigest = SHA256_HEX.test(titleDigestRaw) ? titleDigestRaw : "no_title_digest";
 
     if (urls.length === 0) {
       return jsonWithCors({ error: "missing_url", hint: "pass url or urls[]" }, { status: 400 });
@@ -42,6 +51,30 @@ export async function POST(request: Request) {
     if (!process.env.OPENAI_API_KEY?.trim()) {
       return jsonWithCors({ error: "openai_key_missing" }, { status: 500 });
     }
+
+    const cacheKey = buildCacheKey({ symbol, titleDigest });
+
+    const cached = await getCachedNewsAiSummary(cacheKey);
+    if (cached && cached.summary.length > 0) {
+      console.log("[news-ai-summary] cache HIT", {
+        symbol,
+        titleDigestPrefix: titleDigest.slice(0, 12),
+      });
+      return jsonWithCors({
+        ok: true,
+        cached: true,
+        summary: cached.summary,
+        impact: cached.impact,
+        risk: cached.risk,
+        sourceUrl: cached.source_urls[0] ?? urls[0] ?? "",
+        sourceUrls: cached.source_urls.length > 0 ? cached.source_urls : urls,
+      });
+    }
+
+    console.log("[news-ai-summary] cache MISS → OpenAI", {
+      symbol,
+      titleDigestPrefix: titleDigest.slice(0, 12),
+    });
 
     const outputLanguage = locale.startsWith("en") ? "영어" : "한국어";
     const prompt = `당신은 투자 뉴스 요약 어시스턴트입니다.
@@ -82,17 +115,25 @@ ${urls.map((u, i) => `${i + 1}. ${u}`).join("\n")}`;
     }
 
     if (!parsed) {
-      return jsonWithCors(
-        {
-          ok: true,
-          summary: raw,
-          impact: [],
-          risk: [],
-          sourceUrl: urls[0] ?? "",
-          sourceUrls: urls,
-        },
-        { status: 200 },
-      );
+      const payload = {
+        ok: true,
+        cached: false,
+        summary: raw,
+        impact: [] as string[],
+        risk: [] as string[],
+        sourceUrl: urls[0] ?? "",
+        sourceUrls: urls,
+      };
+      void saveCachedNewsAiSummary({
+        cacheKey,
+        symbol,
+        titleDigest,
+        summary: raw,
+        impact: [],
+        risk: [],
+        sourceUrls: urls,
+      });
+      return jsonWithCors(payload);
     }
 
     const summary =
@@ -104,14 +145,25 @@ ${urls.map((u, i) => `${i + 1}. ${u}`).join("\n")}`;
       ? parsed.risk.filter((v): v is string => typeof v === "string").slice(0, 2)
       : [];
 
-    return jsonWithCors({
+    const payload = {
       ok: true,
+      cached: false,
       summary,
       impact,
       risk,
       sourceUrl: urls[0] ?? "",
       sourceUrls: urls,
+    };
+    void saveCachedNewsAiSummary({
+      cacheKey,
+      symbol,
+      titleDigest,
+      summary,
+      impact,
+      risk,
+      sourceUrls: urls,
     });
+    return jsonWithCors(payload);
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     return jsonWithCors({ error: "news_ai_summary_failed", detail }, { status: 502 });
