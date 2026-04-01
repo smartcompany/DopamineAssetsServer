@@ -74,6 +74,10 @@ export type AssetDetailDto = {
   sector: string | null;
   industry: string | null;
   marketCap: string | null;
+  /** 암호화폐(CoinGecko) 시총 순위, 그 외 null */
+  marketCapRank: number | null;
+  /** 암호화폐(CoinGecko) USD 현재가 표시 문자열, 그 외 null */
+  currentPrice: string | null;
   exchange: string | null;
   currency: string | null;
   description: string | null;

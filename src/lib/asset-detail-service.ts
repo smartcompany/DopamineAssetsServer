@@ -100,6 +100,8 @@ export async function getAssetDetail(params: {
 
   let displayName: string;
   let marketCap: string | null;
+  let marketCapRank: number | null = null;
+  let currentPrice: string | null = null;
   let sector: string | null;
   let industry: string | null;
   let exchange: string | null;
@@ -128,6 +130,8 @@ export async function getAssetDetail(params: {
         if (cgProfile) {
           dataSources.push(`coingecko_coin:${cgProfile.coinId}`);
           marketCap = cgProfile.marketCapFmt;
+          marketCapRank = cgProfile.marketCapRank;
+          currentPrice = cgProfile.currentPriceFmt;
           sector = cgProfile.sector;
           industry = cgProfile.industry;
           exchange = cgProfile.exchange;
@@ -142,6 +146,8 @@ export async function getAssetDetail(params: {
     displayName = name.trim() || cgProfile?.name || symbol;
   } else {
     marketCap = yahoo?.marketCapFmt ?? null;
+    marketCapRank = null;
+    currentPrice = null;
     sector = yahoo?.sector ?? null;
     industry = yahoo?.industry ?? null;
     exchange = yahoo?.exchange ?? null;
@@ -166,6 +172,8 @@ export async function getAssetDetail(params: {
     sector,
     industry,
     marketCap,
+    marketCapRank,
+    currentPrice,
     exchange,
     currency,
     description,
@@ -198,6 +206,8 @@ export function getThemeAssetDetail(themeId: string, displayName: string): Asset
     sector: null,
     industry: null,
     marketCap: null,
+    marketCapRank: null,
+    currentPrice: null,
     exchange: null,
     currency: null,
     description: null,

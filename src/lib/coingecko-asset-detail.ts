@@ -23,6 +23,8 @@ export type CoinGeckoCryptoProfile = {
   coinId: string;
   name: string;
   marketCapFmt: string | null;
+  marketCapRank: number | null;
+  currentPriceFmt: string | null;
   sector: string | null;
   industry: string | null;
   exchange: string | null;
@@ -40,6 +42,31 @@ function formatUsdCompact(n: number): string {
     currency: "USD",
     notation: "compact",
     maximumFractionDigits: 2,
+  }).format(n);
+}
+
+function formatUsdSpot(n: number): string {
+  if (!Number.isFinite(n) || n < 0) return "";
+  if (n >= 1) {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(n);
+  }
+  if (n >= 0.0001) {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 6,
+    }).format(n);
+  }
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumSignificantDigits: 6,
   }).format(n);
 }
 
@@ -176,10 +203,14 @@ async function fetchCoinDetail(coinId: string): Promise<CoinGeckoCryptoProfile |
   const data = await fetchJson<{
     id?: string;
     name?: string;
+    market_cap_rank?: number | null;
     categories?: string[];
     description?: Record<string, string>;
     links?: { homepage?: string[] };
-    market_data?: { market_cap?: { usd?: number | null } };
+    market_data?: {
+      market_cap?: { usd?: number | null };
+      current_price?: { usd?: number | null };
+    };
     tickers?: unknown[];
   }>(u.toString());
 
@@ -197,6 +228,18 @@ async function fetchCoinDetail(coinId: string): Promise<CoinGeckoCryptoProfile |
       ? formatUsdCompact(mcUsd)
       : null;
 
+  const rankRaw = data.market_cap_rank;
+  const marketCapRank =
+    typeof rankRaw === "number" && Number.isFinite(rankRaw) && rankRaw >= 1
+      ? Math.floor(rankRaw)
+      : null;
+
+  const pxUsd = data.market_data?.current_price?.usd;
+  const currentPriceFmt =
+    typeof pxUsd === "number" && Number.isFinite(pxUsd) && pxUsd >= 0
+      ? formatUsdSpot(pxUsd)
+      : null;
+
   const { sector, industry } = pickSectorIndustry(data.categories);
   const exchange = pickTopExchange(data.tickers);
   const description = pickDescription(data.description);
@@ -206,6 +249,8 @@ async function fetchCoinDetail(coinId: string): Promise<CoinGeckoCryptoProfile |
     coinId: id,
     name: coinName,
     marketCapFmt,
+    marketCapRank,
+    currentPriceFmt,
     sector,
     industry,
     exchange,
