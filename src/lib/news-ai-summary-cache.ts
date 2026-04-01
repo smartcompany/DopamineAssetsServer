@@ -122,6 +122,11 @@ export async function saveCachedNewsAiSummary(params: {
         error.hint,
         { symbol: params.symbol, cacheKeyPrefix: params.cacheKey.slice(0, 16) },
       );
+    } else {
+      console.log("[news-ai-summary-cache] upsert OK", {
+        symbol: params.symbol,
+        cacheKeyPrefix: params.cacheKey.slice(0, 16),
+      });
     }
   } catch (e) {
     console.error("[news-ai-summary-cache] upsert exception:", e);

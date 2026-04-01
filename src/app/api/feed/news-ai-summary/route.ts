@@ -124,7 +124,7 @@ ${urls.map((u, i) => `${i + 1}. ${u}`).join("\n")}`;
         sourceUrl: urls[0] ?? "",
         sourceUrls: urls,
       };
-      void saveCachedNewsAiSummary({
+      await saveCachedNewsAiSummary({
         cacheKey,
         symbol,
         titleDigest,
@@ -154,7 +154,7 @@ ${urls.map((u, i) => `${i + 1}. ${u}`).join("\n")}`;
       sourceUrl: urls[0] ?? "",
       sourceUrls: urls,
     };
-    void saveCachedNewsAiSummary({
+    await saveCachedNewsAiSummary({
       cacheKey,
       symbol,
       titleDigest,
