@@ -64,7 +64,11 @@ export async function getCachedNewsAiSummary(
       .select("summary, impact, risk, source_urls")
       .eq("cache_key", cacheKey)
       .maybeSingle();
-    if (error || !data) return null;
+    if (error) {
+      console.error("[news-ai-summary-cache] select failed:", error.message, error.details);
+      return null;
+    }
+    if (!data) return null;
     const impact = Array.isArray(data.impact)
       ? (data.impact as unknown[]).filter((x): x is string => typeof x === "string")
       : [];
@@ -97,7 +101,7 @@ export async function saveCachedNewsAiSummary(params: {
   try {
     const supabase = getSupabaseAdmin();
     const now = new Date().toISOString();
-    await supabase.from("dopamine_news_ai_summary_cache").upsert(
+    const { error } = await supabase.from("dopamine_news_ai_summary_cache").upsert(
       {
         cache_key: params.cacheKey,
         symbol: params.symbol.trim(),
@@ -110,7 +114,16 @@ export async function saveCachedNewsAiSummary(params: {
       },
       { onConflict: "cache_key" },
     );
-  } catch {
-    // 캐시 저장 실패는 요약 응답을 막지 않음
+    if (error) {
+      console.error(
+        "[news-ai-summary-cache] upsert failed:",
+        error.message,
+        error.details,
+        error.hint,
+        { symbol: params.symbol, cacheKeyPrefix: params.cacheKey.slice(0, 16) },
+      );
+    }
+  } catch (e) {
+    console.error("[news-ai-summary-cache] upsert exception:", e);
   }
 }

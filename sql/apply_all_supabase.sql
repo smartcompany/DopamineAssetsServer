@@ -323,6 +323,15 @@ create index dopamine_news_ai_summary_cache_symbol_idx
 
 alter table public.dopamine_news_ai_summary_cache enable row level security;
 
+grant select, insert, update, delete on public.dopamine_news_ai_summary_cache to anon, authenticated;
+
+create policy dopamine_news_ai_summary_cache_anon_all
+  on public.dopamine_news_ai_summary_cache
+  for all
+  to anon, authenticated
+  using (true)
+  with check (true);
+
 comment on table public.dopamine_news_ai_summary_cache is
   '광고 후 뉴스 AI 요약 캐시. cache_key = sha256(v2|SYMBOL|title_digest).';
 
