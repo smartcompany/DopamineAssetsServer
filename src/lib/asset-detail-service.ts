@@ -1,3 +1,4 @@
+import { fetchCryptoProfileFromCoinGecko } from "./coingecko-asset-detail";
 import { fetchMoveSummaryKo } from "./asset-move-summary-batch";
 import { THEME_DEFINITIONS } from "./theme-definitions";
 import type { AssetClass, AssetDetailDto, CommodityKind } from "./types";
@@ -75,7 +76,7 @@ export async function getAssetDetail(params: {
     yahooSym,
   });
   let yahoo = null;
-  if (yahooSym) {
+  if (assetClass !== "crypto" && yahooSym) {
     try {
       yahoo = await fetchYahooQuoteSummary(yahooSym);
       if (yahoo) {
@@ -97,7 +98,58 @@ export async function getAssetDetail(params: {
     }
   }
 
-  const displayName = yahoo?.displayName ?? name ?? symbol;
+  let displayName: string;
+  let marketCap: string | null;
+  let sector: string | null;
+  let industry: string | null;
+  let exchange: string | null;
+  let currency: string | null;
+  let description: string | null;
+  let website: string | null;
+
+  if (assetClass === "crypto") {
+    marketCap = null;
+    sector = null;
+    industry = null;
+    exchange = null;
+    currency = null;
+    description = null;
+    website = null;
+    const pair = parseCryptoPairFromRankingSymbol(symbol);
+    let cgProfile: Awaited<ReturnType<typeof fetchCryptoProfileFromCoinGecko>> = null;
+    if (pair) {
+      try {
+        const label = name.trim() || symbol;
+        cgProfile = await fetchCryptoProfileFromCoinGecko({
+          rankingSymbol: symbol,
+          baseSymbolUpper: pair.base,
+          displayName: label,
+        });
+        if (cgProfile) {
+          dataSources.push(`coingecko_coin:${cgProfile.coinId}`);
+          marketCap = cgProfile.marketCapFmt;
+          sector = cgProfile.sector;
+          industry = cgProfile.industry;
+          exchange = cgProfile.exchange;
+          currency = cgProfile.currency;
+          description = cgProfile.description;
+          website = cgProfile.website;
+        }
+      } catch (e) {
+        console.error("[asset-detail] CoinGecko failed", symbol, e);
+      }
+    }
+    displayName = name.trim() || cgProfile?.name || symbol;
+  } else {
+    marketCap = yahoo?.marketCapFmt ?? null;
+    sector = yahoo?.sector ?? null;
+    industry = yahoo?.industry ?? null;
+    exchange = yahoo?.exchange ?? null;
+    currency = yahoo?.currency ?? null;
+    description = yahoo?.description ?? null;
+    website = yahoo?.website ?? null;
+    displayName = yahoo?.displayName ?? name ?? symbol;
+  }
 
   let moveSummaryKo: string | null = null;
   try {
@@ -111,13 +163,13 @@ export async function getAssetDetail(params: {
     name: displayName,
     assetClass,
     commodityKind,
-    sector: yahoo?.sector ?? null,
-    industry: yahoo?.industry ?? null,
-    marketCap: yahoo?.marketCapFmt ?? null,
-    exchange: yahoo?.exchange ?? null,
-    currency: yahoo?.currency ?? null,
-    description: yahoo?.description ?? null,
-    website: yahoo?.website ?? null,
+    sector,
+    industry,
+    marketCap,
+    exchange,
+    currency,
+    description,
+    website,
     baseCurrency,
     quoteCurrency,
     dataSources,
