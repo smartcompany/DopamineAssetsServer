@@ -74,6 +74,11 @@ export type AssetDetailDto = {
   sector: string | null;
   industry: string | null;
   marketCap: string | null;
+  /**
+   * 시가총액 원시값 — [currency]와 동일 단위(예: KRW=원, USD=달러).
+   * 클라이언트가 로케일별 표기(한국어+KRW → 백만 단위 등)에 사용.
+   */
+  marketCapRaw: number | null;
   /** 암호화폐(CoinGecko) 시총 순위, 그 외 null */
   marketCapRank: number | null;
   /** 암호화폐(CoinGecko) USD 현재가 표시 문자열, 그 외 null */

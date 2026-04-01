@@ -6,6 +6,8 @@ export type YahooQuoteSummaryDetail = {
   sector: string | null;
   industry: string | null;
   marketCapFmt: string | null;
+  /** [currency]와 동일 단위의 시총 숫자 (예: KRW 원) */
+  marketCapRaw: number | null;
   exchange: string | null;
   currency: string | null;
   description: string | null;
@@ -69,10 +71,10 @@ function mapResult(symbol: string, r: QuoteSummaryResult): YahooQuoteSummaryDeta
     pickText(pr?.currency) ?? (typeof sd?.currency === "string" ? sd.currency : null);
 
   const mcRaw = sd?.marketCap ?? pr?.marketCap;
+  const marketCapRaw =
+    typeof mcRaw === "number" && Number.isFinite(mcRaw) && mcRaw > 0 ? mcRaw : null;
   const marketCapFmt =
-    typeof mcRaw === "number" && Number.isFinite(mcRaw) && mcRaw > 0
-      ? formatMarketCap(mcRaw, currency ?? "USD")
-      : null;
+    marketCapRaw != null ? formatMarketCap(marketCapRaw, currency ?? "USD") : null;
 
   const displayName =
     pickText(pr?.longName) ??
@@ -85,6 +87,7 @@ function mapResult(symbol: string, r: QuoteSummaryResult): YahooQuoteSummaryDeta
     sector,
     industry,
     marketCapFmt,
+    marketCapRaw,
     exchange: pickText(pr?.exchangeName) ?? pickText(pr?.exchange),
     currency,
     description,
