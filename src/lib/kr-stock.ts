@@ -106,16 +106,18 @@ function parseNaverSiseHtml(html: string, suffix: "KS" | "KQ"): RankedAssetDto[]
   let m: RegExpExecArray | null;
   while ((m = re.exec(html)) !== null) {
     const code = m[1];
-    const name = m[2]!.trim().replace(/\s+/g, " ");
-    if (isExcludedKrStockName(name)) continue;
+    const listTitle = m[2]!.trim().replace(/\s+/g, " ");
+    if (isExcludedKrStockName(listTitle)) continue;
     const pct = Number.parseFloat(m[3]!);
     if (!Number.isFinite(pct)) continue;
     const priceChangePct = pct;
     const volumeChangePct = 0;
     const score = dopamineScore(priceChangePct, volumeChangePct);
+    const sym = `${code}.${suffix}`;
     rows.push({
-      symbol: `${code}.${suffix}`,
-      name,
+      symbol: sym,
+      // `name`은 dopamine_feed_cache에서 Yahoo quoteSummary로만 채움(네이버 목록 제목 아님).
+      name: sym,
       assetClass: "kr_stock",
       priceChangePct: round2(priceChangePct),
       volumeChangePct: round2(volumeChangePct),
@@ -224,33 +226,41 @@ export async function fetchKrStockNameFromNaver(
 }
 
 /**
- * 캐시용 kr_stock: 심볼마다 Yahoo `quoteSummary` → `name`(영문 표기), 이어서 네이버 메인 → `nameKo`.
- * Yahoo 실패 시 `name`은 네이버 급등락 목록에서 온 기존 값 유지.
+ * 캐시용 kr_stock 표시명.
+ *
+ * 네이버 급등/급락 크롤(`fetchKrStockRowsFromNaver`)은 **Yahoo를 호출하지 않는다**.
+ * 거기서 나오는 건 심볼·등락률뿐이고, 행의 `name` 자리는 플레이스홀더(=심볼)다.
+ * 영문/표준 표기 `name`은 오직 여기서 `quoteSummary` 한 번으로만 가져온다(심볼당 1회).
+ * 이어서 네이버 메인은 `nameKo`(한글)만 채운다.
  */
 export async function enrichKrStockRowsDisplayNamesFromYahooAndNaver(
   rows: RankedAssetDto[],
 ): Promise<void> {
   const kr = rows.filter((r) => r.assetClass === "kr_stock");
   if (kr.length === 0) return;
-  const syms = [...new Set(kr.map((r) => r.symbol))];
-  const symToYahooName = new Map<string, string>();
-  const symToKo = new Map<string, string>();
 
-  for (const sym of syms) {
+  const repBySymbol = new Map<string, RankedAssetDto>();
+  for (const r of kr) {
+    if (!repBySymbol.has(r.symbol)) repBySymbol.set(r.symbol, r);
+  }
+
+  for (const row of repBySymbol.values()) {
+    const sym = row.symbol;
     const y = await fetchYahooQuoteSummary(sym);
     const dn = y?.displayName?.trim();
-    if (dn) symToYahooName.set(sym, dn);
+    row.name = dn != null && dn !== "" ? dn : sym;
 
     const ko = await fetchKrStockNameFromNaver(sym);
-    if (ko != null && ko.trim() !== "") symToKo.set(sym, ko.trim());
+    if (ko != null && ko.trim() !== "") row.nameKo = ko.trim();
 
     await new Promise((resolve) => setTimeout(resolve, 90));
   }
 
   for (const r of kr) {
-    const dn = symToYahooName.get(r.symbol);
-    if (dn) r.name = dn;
-    const ko = symToKo.get(r.symbol);
-    if (ko) r.nameKo = ko;
+    const rep = repBySymbol.get(r.symbol);
+    if (rep != null && r !== rep) {
+      r.name = rep.name;
+      r.nameKo = rep.nameKo;
+    }
   }
 }
