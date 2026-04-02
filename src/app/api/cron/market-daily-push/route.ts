@@ -35,6 +35,12 @@ function truncate(s: string, max: number): string {
   return `${t.slice(0, max - 1)}…`;
 }
 
+function fmtPct(p: number): string {
+  const v = Number.isFinite(p) ? p : 0;
+  const sign = v > 0 ? "+" : "";
+  return `${sign}${v.toFixed(1)}%`;
+}
+
 export async function POST(request: Request) {
   if (!authorizeCron(request)) {
     return jsonWithCors({ error: "unauthorized" }, { status: 401 });
@@ -53,6 +59,8 @@ export async function POST(request: Request) {
     ]);
     const upName = (up.items[0]?.name ?? "").trim();
     const downName = (down.items[0]?.name ?? "").trim();
+    const upPct = up.items[0]?.priceChangePct ?? 0;
+    const downPct = down.items[0]?.priceChangePct ?? 0;
 
     // 혹시 A/B를 못 구했을 때(캐시 비었을 때)를 대비해서 기본 문장도 한 번 준비
     const { briefingKo, briefingEn } = await buildYahooMarketBrief();
@@ -151,15 +159,15 @@ export async function POST(request: Request) {
 
       const title =
         preferredLocale === "en"
-          ? "Daily market summary"
-          : "오늘의 마켓 요약";
+          ? "Money is rushing in."
+          : "지금 돈이 몰립니다.";
 
       const hasUpDown = upName.length > 0 && downName.length > 0;
       const bodyKo = hasUpDown
-        ? `지금 돈이 몰립니다. 불타는 종목: ${upName}.\n 파산 직전 분위기: ${downName}.`
+        ? `불타는 종목: ${upName} (${fmtPct(upPct)}).\n 파산 분위기: ${downName} (${fmtPct(downPct)}).`
         : briefingKo;
       const bodyEn = hasUpDown
-        ? `Money is rushing in. Burning pick: ${upName}.\n crash vibes are building: ${downName}.`
+        ? `Burning pick: ${upName} (${fmtPct(upPct)}).\n Crash vibes: ${downName} (${fmtPct(downPct)}).`
         : briefingEn;
 
       const body = preferredLocale === "en"
