@@ -7,6 +7,7 @@ import {
   getCachedNewsAiSummary,
   saveCachedNewsAiSummary,
 } from "@/lib/news-ai-summary-cache";
+import { fetchArticleExcerptsForNewsAi } from "@/lib/news-ai-article-excerpt";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY ?? "",
@@ -27,6 +28,11 @@ export async function POST(request: Request) {
     const rawList = [...(singleUrl ? [singleUrl] : []), ...rawUrls]
       .filter((v, i, arr) => arr.indexOf(v) === i);
     const urls = canonicalizeNewsUrls(rawList);
+    const rawArticleTitles = Array.isArray((body as Record<string, unknown>).articleTitles)
+      ? ((body as Record<string, unknown>).articleTitles as unknown[])
+          .filter((v): v is string => typeof v === "string")
+          .map((t) => t.trim())
+      : [];
     const locale = typeof body.locale === "string" ? body.locale.trim().toLowerCase() : "";
     const symbol = typeof body.symbol === "string" ? body.symbol.trim() : "";
     const assetClass = typeof body.assetClass === "string" ? body.assetClass.trim() : "";
@@ -76,26 +82,62 @@ export async function POST(request: Request) {
       titleDigestPrefix: titleDigest.slice(0, 12),
     });
 
+    const feedTitlesForFetch = urls.map((_, i) => rawArticleTitles[i] ?? "");
+    const excerpts = await fetchArticleExcerptsForNewsAi(urls, feedTitlesForFetch);
+
     const outputLanguage = locale.startsWith("en") ? "영어" : "한국어";
-    const prompt = `당신은 투자 뉴스 요약 어시스턴트입니다.
-아래 URL 목록과 종목 메타 정보를 바탕으로 요약하세요.
-경제 기자의 관점에서 의견을 남겨 주세요.
+    // AI 프롬프트에는 URL을 넣지 않음(모델이 '링크를 열 수 없다' 면책을 쓰는 빈도를 줄이기 위함).
+    const articleBlock = excerpts
+      .map((ex, i) => {
+        const head = [`${i + 1}. 제목: ${ex.title}`];
+        if (ex.excerpt.length > 0) {
+          head.push(`   본문 앞부분(일부): ${ex.excerpt}`);
+        } else {
+          head.push(
+            `   본문: (발췌 없음 — 아래 제목·종목 맥락만으로 요약)`,
+          );
+        }
+        return head.join("\n");
+      })
+      .join("\n\n");
+
+    const toneBlock =
+      outputLanguage === "영어"
+        ? `Brand voice: **Dopamine Assets** — high-energy, playful, a little meme-adjacent, but still sharp and useful. Think "trading floor banter + one clever hook", NOT corporate boilerplate, NOT cringe overload.
+- summary: Start with a punchy hook. Short sentences. One vivid metaphor or joke is OK if it helps clarity. Still fact-grounded.
+- impact: Bullet-ish energy — why traders might care *now* (momentum, narrative, flow). Avoid stiff labels like "Positive factor 1".
+- risk: Honest "cold water" / what could go wrong — same lively tone, not legal-dead.
+- Emoji: optional, at most one per field across the whole JSON (or none). No emoji spam.
+- Never apologize for "not opening links"; you only have the text below. If excerpt is missing, stay confident and work from titles + stock context.`
+        : `톤: 앱 이름이 **도파민 자산**인 것처럼, **텐션 있고 재미있되** 가벼운 농담 수준은 OK, **사실·논리는 지키세요**. 딱딱한 경제 용례 나열·보고서체는 피하세요.
+- summary: 첫 문장부터 훅(왜 지금 이 뉴스인지). 3~5문장. 비유·한 마디 드립은 정보 전달에 도움 될 때만.
+- impact: "왜 불타는지/왜 관심 가는지" 느낌으로 최대 3개. '호재 1' 같은 뻔한 제목 금지.
+- risk: '현실 찬물'·'졸업하며 볼 포인트' 정도로 솔직하게 최대 2개. 겁주기 금지, 과장 금지.
+- 이몼지: 전체 JSON에서 필드당 최대 1개 이하(없어도 됨). 남발 금지.
+- 링크·URL 언급이나 '열 수 없다' 류 면책 금지. 발췌가 없으면 제목·종목 맥락으로 당당히 요약.`;
+
+    const prompt = `당신은 **도파민 자산(Dopamine Assets)** 앱용 뉴스 큐레이터입니다.
+아래 각 기사에 대해 **제목**과, 가능한 경우 **본문 앞부분(일부만)** 만 제공됩니다. 본문은 비용·토큰 절약을 위해 잘린 발췌이며 전문이 아닙니다. (원문 링크는 프롬프트에 포함하지 않습니다.)
+
+${toneBlock}
+
 응답 언어는 반드시 ${outputLanguage}로 작성하세요.
 
 [출력 형식]
-반드시 JSON 하나만 출력:
+반드시 JSON 하나만 출력 (키 이름·배열 구조는 고정):
 {
-  "summary": "3~5문장 핵심 요약",
-  "impact": ["주가/가격 영향 포인트 최대 3개"],
-  "risk": ["리스크/불확실성 최대 2개"]
+  "summary": "3~5문장. 훅 있게, 도파민 자산 톤.",
+  "impact": ["최대 3개 — 재미있게 쓰되 투자 포인트가 드러나게"],
+  "risk": ["최대 2개 — 솔직한 주의점, 무겁게만 쓰지 말 것"]
 }
 
 [종목 정보]
 - 종목명: ${assetName || "(없음)"}
 - 심볼: ${symbol || "(없음)"}
 - 자산 클래스: ${assetClass || "(없음)"}
-- 기사 URL 목록:
-${urls.map((u, i) => `${i + 1}. ${u}`).join("\n")}`;
+
+[기사별 제목 · 본문 발췌(앞부분)]
+${articleBlock}`;
 
     const completion = await openai.chat.completions.create({
       model: openAIChatConfig.model,
