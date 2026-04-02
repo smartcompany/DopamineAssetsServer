@@ -364,6 +364,16 @@ alter table public.dopamine_user_favorite_assets enable row level security;
 comment on table public.dopamine_user_favorite_assets is
   '앱 관심 종목. 클라이언트는 /api/profile/favorites (Firebase Bearer) 경유.';
 
+-- ---------------------------------------------------------------------------
+-- 14) 닉네임 유일 (정규화 유니크 인덱스 — 동시 요청 최종 방어)
+-- ---------------------------------------------------------------------------
+create unique index if not exists dopamine_user_profiles_display_name_normalized_unique
+  on public.dopamine_user_profiles (lower(trim(display_name)))
+  where length(trim(coalesce(display_name, ''))) > 0;
+
+comment on index public.dopamine_user_profiles_display_name_normalized_unique is
+  '표시 닉네임 중복 방지(API 선조회 + DB 최종 방어). 빈 닉네임은 여러 행 허용.';
+
 -- =============================================================================
 -- 끝
 -- =============================================================================

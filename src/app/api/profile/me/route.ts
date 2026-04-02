@@ -1,6 +1,7 @@
 import { jsonWithCors } from "@/lib/cors";
 import { parseBearerUid } from "@/lib/auth-bearer";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { isDisplayNameTakenByOther } from "@/lib/profile-display-name";
 import { checkBannedWords } from "@/lib/validate-banned-words";
 
 const MAX_NAME = 80;
@@ -57,6 +58,13 @@ export async function PATCH(request: Request) {
 
   try {
     const supabase = getSupabaseAdmin();
+    if (hasDisplayName) {
+      const taken = await isDisplayNameTakenByOther(supabase, uid, rawName);
+      if (taken) {
+        return jsonWithCors({ error: "display_name_taken" }, { status: 409 });
+      }
+    }
+
     const { error } = await supabase.from("dopamine_user_profiles").upsert(
       {
         uid,
@@ -67,6 +75,9 @@ export async function PATCH(request: Request) {
       { onConflict: "uid" },
     );
     if (error) {
+      if (error.code === "23505") {
+        return jsonWithCors({ error: "display_name_taken" }, { status: 409 });
+      }
       console.error(error);
       return jsonWithCors(
         { error: "supabase_error", detail: error.message },
