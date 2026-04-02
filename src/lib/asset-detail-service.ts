@@ -64,8 +64,11 @@ export async function getAssetDetail(params: {
   assetClass: AssetClass;
   name: string;
   commodityKind?: CommodityKind;
+  /** `ko` — kr_stock 표시명을 네이버 한글 우선. 그 외 — Yahoo(영문) 우선 (랭킹 `locale`과 동일) */
+  locale?: string;
 }): Promise<AssetDetailDto> {
-  const { symbol, assetClass, name, commodityKind } = params;
+  const { symbol, assetClass, name, commodityKind, locale = "en" } = params;
+  const preferKoName = locale.trim().toLowerCase().startsWith("ko");
   const dataSources: string[] = [];
   const asOf = new Date().toISOString();
 
@@ -171,11 +174,28 @@ export async function getAssetDetail(params: {
     currency = yahoo?.currency ?? null;
     description = yahoo?.description ?? null;
     website = yahoo?.website ?? null;
-    displayName = naverKrName ?? yahoo?.displayName ?? name ?? symbol;
+
+    const yahooDn = yahoo?.displayName?.trim();
+    const yahooPick = yahooDn != null && yahooDn !== "" ? yahooDn : null;
+    const naverPick =
+      naverKrName != null && naverKrName.trim() !== ""
+        ? naverKrName.trim()
+        : null;
+    const reqPick = name.trim().length > 0 ? name.trim() : null;
+
+    if (assetClass === "kr_stock" && preferKoName) {
+      displayName = naverPick ?? yahooPick ?? reqPick ?? symbol;
+    } else if (assetClass === "kr_stock") {
+      displayName = yahooPick ?? naverPick ?? reqPick ?? symbol;
+    } else {
+      displayName = naverPick ?? yahooPick ?? reqPick ?? symbol;
+    }
 
     if (assetClass === "kr_stock") {
       console.log("[asset-detail][kr_stock name decision]", {
         symbol,
+        locale,
+        preferKoName,
         requestName: name,
         naverKrName,
         yahooDisplayName: yahoo?.displayName,

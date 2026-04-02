@@ -1,5 +1,6 @@
 import { jsonWithCors } from "@/lib/cors";
 import { getAssetDetail, getThemeAssetDetail } from "@/lib/asset-detail-service";
+import { resolveRankingsLocale } from "@/lib/feed-rankings-service";
 import { resolveThemeIdByDisplayName } from "@/lib/theme-definitions";
 import type { AssetClass, CommodityKind } from "@/lib/types";
 
@@ -44,6 +45,7 @@ export async function GET(request: Request) {
   }
 
   try {
+    const locale = resolveRankingsLocale(request, url.searchParams);
     const data = await getAssetDetail({
       symbol,
       assetClass,
@@ -51,6 +53,7 @@ export async function GET(request: Request) {
       commodityKind: commodityKindRaw
         ? (commodityKindRaw as CommodityKind)
         : undefined,
+      locale,
     });
     return jsonWithCors(data);
   } catch (e) {
