@@ -1,5 +1,5 @@
 import { jsonWithCors } from "@/lib/cors";
-import { parseBearerUid } from "@/lib/auth-bearer";
+import { parseBearerAuth, parseBearerUid } from "@/lib/auth-bearer";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { isDisplayNameTakenByOther } from "@/lib/profile-display-name";
 import { checkBannedWords } from "@/lib/validate-banned-words";
@@ -11,10 +11,11 @@ function isMissingTableError(error: { code?: string } | null | undefined) {
 }
 
 export async function PATCH(request: Request) {
-  const uid = await parseBearerUid(request);
-  if (!uid) {
+  const auth = await parseBearerAuth(request);
+  if (!auth) {
     return jsonWithCors({ error: "missing_or_invalid_token" }, { status: 401 });
   }
+  const { uid, email: authEmail } = auth;
 
   let body: unknown;
   try {
@@ -70,6 +71,7 @@ export async function PATCH(request: Request) {
         uid,
         ...(hasDisplayName ? { display_name: rawName } : {}),
         ...(hasPhotoUrl ? { photo_url: photoUrl } : {}),
+        auth_email: authEmail,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "uid" },

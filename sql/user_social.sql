@@ -5,6 +5,7 @@ create table if not exists public.dopamine_user_profiles (
   uid text primary key,
   display_name text,
   photo_url text,
+  auth_email text,
   updated_at timestamptz not null default now()
 );
 alter table public.dopamine_user_profiles enable row level security;
