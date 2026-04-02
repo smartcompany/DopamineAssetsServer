@@ -1,20 +1,37 @@
 import { fetchAssetNews } from "@/lib/asset-news-fetch";
 import { jsonWithCors } from "@/lib/cors";
+import { fetchKrStockNameFromNaver } from "@/lib/kr-stock";
 
 const DEFAULT_LIMIT = 15;
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const q = url.searchParams.get("q")?.trim() ?? "";
+  let q = url.searchParams.get("q")?.trim() ?? "";
   const limitRaw = url.searchParams.get("limit");
   const limit = limitRaw
     ? Number.parseInt(limitRaw, 10)
     : DEFAULT_LIMIT;
 
+  const assetClassRaw = url.searchParams.get("assetClass")?.trim() ?? "";
+  const symbolParam = url.searchParams.get("symbol")?.trim() ?? "";
+
+  if (assetClassRaw === "kr_stock" && symbolParam.length > 0) {
+    try {
+      const naverKrName = await fetchKrStockNameFromNaver(symbolParam);
+      if (naverKrName != null && naverKrName.trim() !== "") {
+        q = `${naverKrName.trim()} 주식`;
+      }
+    } catch (e) {
+      console.error("[asset-news] Naver kr_stock name failed", symbolParam, e);
+    }
+  }
+
   console.log("[asset-news][q received]", {
     q,
-    qHasReplacement: q.includes("�"),
+    qHasReplacement: q.includes("\uFFFD"),
     qLength: q.length,
+    symbolParam: symbolParam || undefined,
+    assetClass: assetClassRaw || undefined,
   });
 
   if (q.length === 0) {
@@ -30,9 +47,10 @@ export async function GET(request: Request) {
     return jsonWithCors({ error: "invalid_limit" }, { status: 400 });
   }
 
-  const assetClass = url.searchParams.get("assetClass")?.trim();
+  const assetClass =
+    assetClassRaw.length > 0 ? assetClassRaw : undefined;
   const result = await fetchAssetNews(q, limit, {
-    assetClass: assetClass && assetClass.length > 0 ? assetClass : undefined,
+    assetClass,
   });
   if (!result.ok) {
     return jsonWithCors(
