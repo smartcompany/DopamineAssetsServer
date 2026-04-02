@@ -126,6 +126,10 @@ export async function POST(request: Request) {
     let attempted = 0;
     let sent = 0;
     let skipped = 0;
+    const totalTokenCount = [...byUid.values()].reduce(
+      (acc, arr) => acc + (arr?.length ?? 0),
+      0,
+    );
 
     for (const [uid, tokens] of byUid) {
       const uniq = [...new Set(tokens)];
@@ -182,6 +186,17 @@ export async function POST(request: Request) {
       }
       sent += 1;
     }
+
+    console.log("[market-daily-push] summary", {
+      dayKst,
+      upName,
+      downName,
+      uids: byUid.size,
+      totalTokens: totalTokenCount,
+      attempted,
+      sent,
+      skipped,
+    });
 
     return jsonWithCors({
       ok: true,

@@ -146,6 +146,8 @@ export async function sendFcmToTokens(params: {
   const messaging = admin.messaging();
   const chunkSize = 500;
   const invalid: string[] = [];
+  let successCount = 0;
+  let failureCount = 0;
 
   for (let i = 0; i < tokens.length; i += chunkSize) {
     const chunk = tokens.slice(i, i + chunkSize);
@@ -155,6 +157,8 @@ export async function sendFcmToTokens(params: {
         notification: { title, body },
         data,
       });
+      successCount += res.successCount ?? 0;
+      failureCount += res.failureCount ?? 0;
       res.responses.forEach((r, idx) => {
         if (r.success) return;
         const code = r.error?.code ?? "";
@@ -175,6 +179,14 @@ export async function sendFcmToTokens(params: {
     const supabase = getSupabaseAdmin();
     await deleteInvalidFcmTokens(supabase, [...new Set(invalid)]);
   }
+
+  console.log("[push] fcm multicast summary", {
+    title,
+    totalTokens: tokens.length,
+    successCount,
+    failureCount,
+    invalidRemoved: invalid.length > 0 ? [...new Set(invalid)].length : 0,
+  });
 }
 
 export async function notifyCommentReply(params: {
