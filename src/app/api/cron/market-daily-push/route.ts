@@ -156,10 +156,10 @@ export async function POST(request: Request) {
 
       const hasUpDown = upName.length > 0 && downName.length > 0;
       const bodyKo = hasUpDown
-        ? `지금 돈이 몰립니다. 불타는 종목: ${upName}. 반대로 파산 직전 분위기: ${downName}.`
+        ? `지금 돈이 몰립니다. 불타는 종목: ${upName}.\n 파산 직전 분위기: ${downName}.`
         : briefingKo;
       const bodyEn = hasUpDown
-        ? `Money is rushing in. Burning pick: ${upName}. Meanwhile, crash vibes are building: ${downName}.`
+        ? `Money is rushing in. Burning pick: ${upName}.\n crash vibes are building: ${downName}.`
         : briefingEn;
 
       const body = preferredLocale === "en"
