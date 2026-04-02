@@ -25,7 +25,7 @@ function cryptoSymbolToYahooUsd(symbol: string): string | null {
 }
 
 /** Bybit 대체: `BTCUSDT` 등에서 베이스/쿼트 추정 (Vercel에서 Bybit 403 회피). */
-function parseCryptoPairFromRankingSymbol(symbol: string): {
+export function parseCryptoPairFromRankingSymbol(symbol: string): {
   base: string;
   quote: string;
 } | null {

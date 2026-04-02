@@ -1,7 +1,8 @@
 import { resolveYahooSymbol } from "@/lib/asset-detail-service";
+import { fetchCoinGeckoOhlcBarsForCryptoRankingSymbol } from "@/lib/coingecko-chart";
 import { jsonWithCors } from "@/lib/cors";
-import { fetchYahooOhlcBars } from "@/lib/yahoo-chart";
 import type { AssetClass } from "@/lib/types";
+import { fetchYahooOhlcBars, type OhlcBar } from "@/lib/yahoo-chart";
 
 const CLASSES = new Set<AssetClass>(["us_stock", "kr_stock", "crypto", "commodity"]);
 
@@ -23,6 +24,7 @@ export async function GET(request: Request) {
   const symbol = url.searchParams.get("symbol")?.trim();
   const assetClass = url.searchParams.get("assetClass")?.trim() as AssetClass | undefined;
   const range = url.searchParams.get("range")?.trim() ?? "3mo";
+  const assetName = url.searchParams.get("assetName")?.trim() ?? "";
 
   if (!symbol || symbol.length === 0) {
     return jsonWithCors({ error: "missing_symbol" }, { status: 400 });
@@ -38,12 +40,35 @@ export async function GET(request: Request) {
 
   try {
     const r = range === "1mo" || range === "1y" || range === "3mo" ? range : "3mo";
-    const days = rangeDays(r);
-    const bars = await fetchYahooOhlcBars(yahooSym, days);
+    let bars: OhlcBar[];
+    let chartSource: "yahoo" | "coingecko";
+
+    if (assetClass === "crypto") {
+      const cg = await fetchCoinGeckoOhlcBarsForCryptoRankingSymbol({
+        rankingSymbol: symbol,
+        displayName: assetName.length > 0 ? assetName : null,
+        range: r,
+      });
+      if (!cg || cg.length === 0) {
+        console.error("[asset-chart] CoinGecko returned no bars", { symbol, yahooSym });
+        return jsonWithCors(
+          { error: "upstream_failed", detail: "coingecko_no_bars" },
+          { status: 502 },
+        );
+      }
+      bars = cg;
+      chartSource = "coingecko";
+    } else {
+      const days = rangeDays(r);
+      bars = await fetchYahooOhlcBars(yahooSym, days);
+      chartSource = "yahoo";
+    }
+
     return jsonWithCors({
       symbol,
       assetClass,
       yahooSymbol: yahooSym,
+      chartSource,
       interval: "1d",
       range,
       bars,
