@@ -6,7 +6,7 @@ export const maxDuration = 120;
 export async function GET(request: Request) {
   const url = new URL(request.url);
   try {
-    const data = await getFeedRankings("down", url.searchParams);
+    const data = await getFeedRankings("down", url.searchParams, request);
     return jsonWithCors(data);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown";

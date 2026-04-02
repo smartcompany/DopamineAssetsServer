@@ -215,11 +215,31 @@ export async function fetchKrStockNameFromNaver(
   const url = `https://finance.naver.com/item/main.naver?code=${code}`;
   try {
     const html = await fetchNaverHtml(url);
-    const name = parseKrStockNameFromNaverHtml(html);
-    console.log("[kr-stock][naver parsed name]", { symbol, code, name });
-    return name;
+    return parseKrStockNameFromNaverHtml(html);
   } catch (e) {
     console.error("[kr-stock] failed to fetch name", { symbol, code, e });
     return null;
+  }
+}
+
+/**
+ * GitHub Actions `refresh-feed-cache` 전용 — 종목 메인 페이지에서 `nameKo` 채움.
+ * Vercel 랭킹 API는 여전히 Supabase만 읽고, `locale=ko`일 때 `nameKo`→`name` 매핑만 한다.
+ */
+export async function enrichKrStockRowsWithNaverMainKoreanNames(
+  rows: RankedAssetDto[],
+): Promise<void> {
+  const kr = rows.filter((r) => r.assetClass === "kr_stock");
+  if (kr.length === 0) return;
+  const syms = [...new Set(kr.map((r) => r.symbol))];
+  const symToKo = new Map<string, string>();
+  for (const sym of syms) {
+    const ko = await fetchKrStockNameFromNaver(sym);
+    if (ko != null && ko.trim() !== "") symToKo.set(sym, ko.trim());
+    await new Promise((resolve) => setTimeout(resolve, 90));
+  }
+  for (const r of kr) {
+    const ko = symToKo.get(r.symbol);
+    if (ko) r.nameKo = ko;
   }
 }

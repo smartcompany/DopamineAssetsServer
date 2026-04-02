@@ -13,7 +13,10 @@ import { fetchCoinGeckoMarketRowsForCache } from "../src/lib/coingecko-markets";
 import { FEED_CACHE_ID } from "../src/lib/feed-cache-constants";
 import { buildRankedRowFromYahooDaily } from "../src/lib/feed-rankings-row";
 import { FEED_UNIVERSE } from "../src/lib/feed-universe";
-import { fetchKrStockRowsFromNaver } from "../src/lib/kr-stock";
+import {
+  enrichKrStockRowsWithNaverMainKoreanNames,
+  fetchKrStockRowsFromNaver,
+} from "../src/lib/kr-stock";
 import { fetchYahooDayMovers } from "../src/lib/yahoo-screener";
 import { computeAllThemesRows } from "../src/lib/themes-service";
 import { THEME_DEFINITIONS } from "../src/lib/theme-definitions";
@@ -151,6 +154,8 @@ async function main() {
     console.log(
       `[refresh-feed-cache] kr_stock store pre=${krRows.length} store=${krStore.length}`,
     );
+    console.log("[refresh-feed-cache] kr_stock enrich nameKo (Naver main)…");
+    await enrichKrStockRowsWithNaverMainKoreanNames(krStore);
     await upsertRankedFeedIfHasData(supabase, FEED_CACHE_ID.kr_stock, krStore);
   } catch (e) {
     console.error(

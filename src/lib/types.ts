@@ -26,6 +26,8 @@ export type CommodityKind =
 export type RankedAssetDto = {
   symbol: string;
   name: string;
+  /** 네이버 종목 메인 제목 기준 한글명 — `refresh-feed-cache`가 채움. `locale=ko` 랭킹 응답에서 `name`으로 승격 */
+  nameKo?: string;
   assetClass: AssetClass;
   commodityKind?: CommodityKind;
   priceChangePct: number;

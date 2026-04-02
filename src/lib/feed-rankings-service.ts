@@ -12,8 +12,39 @@ export type FeedRankingsResponse = {
   items: RankedAssetDto[];
 };
 
-function cacheKey(direction: string, searchParams: URLSearchParams): string {
-  return `${direction}?${searchParams.toString()}`;
+/** 쿼리 `locale` 또는 `Accept-Language` — 한국어일 때 kr_stock `nameKo`→`name` */
+export function resolveRankingsLocale(
+  request: Request,
+  searchParams: URLSearchParams,
+): string {
+  const q = searchParams.get("locale")?.trim().toLowerCase() ?? "";
+  if (q.startsWith("ko")) return "ko";
+  if (q.startsWith("en")) return "en";
+  const al = request.headers.get("accept-language") ?? "";
+  const first = al.split(",")[0]?.trim().toLowerCase() ?? "";
+  if (first.startsWith("ko")) return "ko";
+  return "en";
+}
+
+function cacheKey(
+  direction: string,
+  searchParams: URLSearchParams,
+  localeBucket: string,
+): string {
+  return `${direction}?${searchParams.toString()}&__loc=${localeBucket}`;
+}
+
+function applyRankingsLocale(
+  items: RankedAssetDto[],
+  locale: string,
+): RankedAssetDto[] {
+  if (!locale.startsWith("ko")) return items;
+  return items.map((it) => {
+    if (it.assetClass !== "kr_stock") return it;
+    const ko = it.nameKo?.trim();
+    if (ko) return { ...it, name: ko };
+    return it;
+  });
 }
 
 function parseSource(raw: string | null): "universe" | "yahoo_us" {
@@ -51,12 +82,16 @@ function finalizeRankings(
 /**
  * 랭킹은 Supabase `dopamine_feed_cache`만 사용한다 (GitHub Actions가 주기 갱신).
  * 요청당 서드파티(Yahoo·네이버·CoinGecko) 호출 없음.
+ * @param request 생략 시 로케일 `en`(kr_stock 한글명 치환 없음). HTTP 핸들러는 Request 전달.
  */
 export async function getFeedRankings(
   direction: "up" | "down",
   searchParams: URLSearchParams,
+  request?: Request | null,
 ): Promise<FeedRankingsResponse> {
-  const key = cacheKey(direction, searchParams);
+  const locale = request ? resolveRankingsLocale(request, searchParams) : "en";
+  const localeBucket = locale.startsWith("ko") ? "ko" : "en";
+  const key = cacheKey(direction, searchParams, localeBucket);
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < CACHE_TTL_MS) {
     return hit.body;
@@ -121,7 +156,8 @@ export async function getFeedRankings(
     }
   }
 
-  const items = finalizeRankings(direction, rows, limit);
+  let items = finalizeRankings(direction, rows, limit);
+  items = applyRankingsLocale(items, locale);
 
   const body: FeedRankingsResponse = {
     asOf: new Date().toISOString(),
