@@ -135,6 +135,13 @@ export async function POST(request: Request) {
       const uniq = [...new Set(tokens)];
       const prefs = await loadPushPrefs(supabase, uid);
       if (!prefs.master_enabled || !prefs.market_daily_brief) {
+        console.warn("[market-daily-push] skip by prefs", {
+          dayKst,
+          uid,
+          masterEnabled: prefs.master_enabled,
+          marketDailyBrief: prefs.market_daily_brief,
+          tokensCount: uniq.length,
+        });
         skipped += 1;
         continue;
       }
@@ -146,6 +153,11 @@ export async function POST(request: Request) {
         .eq("day_utc", dayKst)
         .maybeSingle();
       if (already) {
+        console.warn("[market-daily-push] skip by already-sent", {
+          dayKst,
+          uid,
+          tokensCount: uniq.length,
+        });
         skipped += 1;
         continue;
       }
