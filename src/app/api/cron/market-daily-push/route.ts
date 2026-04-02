@@ -59,16 +59,48 @@ export async function POST(request: Request) {
     const supabase = getSupabaseAdmin();
     const dayKst = kstDateString(new Date());
 
-    const { data: tokenRows, error: tokErr } = await supabase
+    // NOTE: 기존 DB에 locale 컬럼이 아직 없는 경우(마이그레이션 미적용)도
+    // 크론이 죽지 않도록 폴백한다.
+    let tokenRows: Array<{ uid: string; fcm_token: string; locale?: string }> =
+      [];
+    const { data: tokData1, error: tokErr1 } = await supabase
       .from("dopamine_device_push_tokens")
       .select("uid, fcm_token, locale");
 
-    if (tokErr) {
-      console.error(tokErr);
-      return jsonWithCors(
-        { error: "supabase_error", detail: tokErr.message },
-        { status: 500 },
-      );
+    if (tokErr1) {
+      const code = (tokErr1 as { code?: string }).code ?? "";
+      if (code === "42703") {
+        console.warn(
+          "[market-daily-push] locale column missing; fallback to default ko",
+        );
+        const { data: tokData2, error: tokErr2 } = await supabase
+          .from("dopamine_device_push_tokens")
+          .select("uid, fcm_token");
+        if (tokErr2) {
+          console.error(tokErr2);
+          return jsonWithCors(
+            { error: "supabase_error", detail: tokErr2.message },
+            { status: 500 },
+          );
+        }
+        tokenRows = (tokData2 ?? []) as Array<{
+          uid: string;
+          fcm_token: string;
+          locale?: string;
+        }>;
+      } else {
+        console.error(tokErr1);
+        return jsonWithCors(
+          { error: "supabase_error", detail: tokErr1.message },
+          { status: 500 },
+        );
+      }
+    } else {
+      tokenRows = (tokData1 ?? []) as Array<{
+        uid: string;
+        fcm_token: string;
+        locale?: string;
+      }>;
     }
 
     const byUid = new Map<string, string[]>();
