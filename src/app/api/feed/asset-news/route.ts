@@ -11,6 +11,12 @@ export async function GET(request: Request) {
     ? Number.parseInt(limitRaw, 10)
     : DEFAULT_LIMIT;
 
+  console.log("[asset-news][q received]", {
+    q,
+    qHasReplacement: q.includes("�"),
+    qLength: q.length,
+  });
+
   if (q.length === 0) {
     return jsonWithCors(
       { error: "missing_q", hint: "Use ?q=BTC or ?q=bitcoin+etf" },

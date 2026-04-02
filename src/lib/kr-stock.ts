@@ -32,7 +32,71 @@ async function fetchNaverHtml(url: string): Promise<string> {
     throw new Error(`Naver HTTP ${response.status} for ${url}`);
   }
   const buf = Buffer.from(await response.arrayBuffer());
-  return iconv.decode(buf, "euc-kr");
+
+  const contentType = response.headers.get("content-type") ?? "";
+  const charsetMatch = contentType.match(/charset\s*=\s*([^;]+)/i);
+  const charsetRaw = charsetMatch?.[1]?.trim()?.toLowerCase() ?? "";
+
+  const decodeUtf8 = () => buf.toString("utf8");
+  const decodeEucKr = () => iconv.decode(buf, "euc-kr");
+  const debugItemMain = url.includes("finance.naver.com/item/main.naver?code=");
+
+  const extractTitlePreview = (html: string) => {
+    const m = html.match(/<title[^>]*>\s*([^<]+)\s*<\/title>/i);
+    const t = m?.[1]?.trim() ?? "";
+    return t.length > 140 ? t.slice(0, 140) + "…" : t;
+  };
+
+  if (charsetRaw.includes("utf-8") || charsetRaw.includes("utf8")) {
+    const utf8 = decodeUtf8();
+    if (debugItemMain) {
+      console.log("[kr-stock][naver decode utf8]", {
+        url,
+        contentType,
+        charsetRaw,
+        title: extractTitlePreview(utf8),
+      });
+    }
+    return utf8;
+  }
+
+  if (
+    charsetRaw.includes("euc-kr") ||
+    charsetRaw.includes("euckr") ||
+    charsetRaw.includes("ks_c_5601")
+  ) {
+    const euc = decodeEucKr();
+    if (debugItemMain) {
+      console.log("[kr-stock][naver decode euc-kr]", {
+        url,
+        contentType,
+        charsetRaw,
+        title: extractTitlePreview(euc),
+      });
+    }
+    return euc;
+  }
+
+  const utf8 = decodeUtf8();
+  const euc = decodeEucKr();
+  const hangulUtf8 = (utf8.match(/[\uAC00-\uD7AF]/g) ?? []).length;
+  const hangulEuc = (euc.match(/[\uAC00-\uD7AF]/g) ?? []).length;
+  const chosen = hangulEuc > hangulUtf8 ? "euc-kr" : "utf-8";
+
+  if (debugItemMain) {
+    console.log("[kr-stock][naver decode fallback]", {
+      url,
+      contentType,
+      charsetRaw,
+      hangulUtf8,
+      hangulEuc,
+      chosen,
+      titleUtf8: extractTitlePreview(utf8),
+      titleEuc: extractTitlePreview(euc),
+    });
+  }
+
+  return hangulEuc > hangulUtf8 ? euc : utf8;
 }
 
 function parseNaverSiseHtml(html: string, suffix: "KS" | "KQ"): RankedAssetDto[] {
@@ -151,7 +215,9 @@ export async function fetchKrStockNameFromNaver(
   const url = `https://finance.naver.com/item/main.naver?code=${code}`;
   try {
     const html = await fetchNaverHtml(url);
-    return parseKrStockNameFromNaverHtml(html);
+    const name = parseKrStockNameFromNaverHtml(html);
+    console.log("[kr-stock][naver parsed name]", { symbol, code, name });
+    return name;
   } catch (e) {
     console.error("[kr-stock] failed to fetch name", { symbol, code, e });
     return null;

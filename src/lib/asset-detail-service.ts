@@ -172,6 +172,16 @@ export async function getAssetDetail(params: {
     description = yahoo?.description ?? null;
     website = yahoo?.website ?? null;
     displayName = naverKrName ?? yahoo?.displayName ?? name ?? symbol;
+
+    if (assetClass === "kr_stock") {
+      console.log("[asset-detail][kr_stock name decision]", {
+        symbol,
+        requestName: name,
+        naverKrName,
+        yahooDisplayName: yahoo?.displayName,
+        finalName: displayName,
+      });
+    }
   }
 
   let moveSummaryKo: string | null = null;
