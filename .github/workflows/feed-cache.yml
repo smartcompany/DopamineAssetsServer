@@ -6,12 +6,13 @@ name: Feed cache refresh
 on:
   schedule:
     - cron: "0 * * * *"
-    - cron: "0 0 * * *"
+    # 10:00 KST = 01:00 UTC
+    - cron: "0 1 * * *"
   workflow_dispatch: {}
 
 jobs:
   refresh:
-    if: github.event_name == 'schedule' && github.event.schedule == '0 * * * *'
+    if: (github.event_name == 'schedule' && github.event.schedule == '0 * * * *') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -27,8 +28,8 @@ jobs:
           NEXT_PUBLIC_SUPABASE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_KEY }}
         run: npm ci && npm run refresh-feed-cache
 
-  market_daily_push_9am:
-    if: github.event_name == 'schedule' && github.event.schedule == '0 0 * * *'
+  market_daily_push_10am:
+    if: (github.event_name == 'schedule' && github.event.schedule == '0 1 * * *') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: production
     steps:
