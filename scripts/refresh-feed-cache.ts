@@ -14,7 +14,7 @@ import { FEED_CACHE_ID } from "../src/lib/feed-cache-constants";
 import { buildRankedRowFromYahooDaily } from "../src/lib/feed-rankings-row";
 import { FEED_UNIVERSE } from "../src/lib/feed-universe";
 import {
-  enrichKrStockRowsWithNaverMainKoreanNames,
+  enrichKrStockRowsDisplayNamesFromYahooAndNaver,
   fetchKrStockRowsFromNaver,
 } from "../src/lib/kr-stock";
 import { fetchYahooDayMovers } from "../src/lib/yahoo-screener";
@@ -154,8 +154,10 @@ async function main() {
     console.log(
       `[refresh-feed-cache] kr_stock store pre=${krRows.length} store=${krStore.length}`,
     );
-    console.log("[refresh-feed-cache] kr_stock enrich nameKo (Naver main)…");
-    await enrichKrStockRowsWithNaverMainKoreanNames(krStore);
+    console.log(
+      "[refresh-feed-cache] kr_stock enrich name=Yahoo, nameKo=Naver (per symbol)…",
+    );
+    await enrichKrStockRowsDisplayNamesFromYahooAndNaver(krStore);
     await upsertRankedFeedIfHasData(supabase, FEED_CACHE_ID.kr_stock, krStore);
   } catch (e) {
     console.error(

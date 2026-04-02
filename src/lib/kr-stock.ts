@@ -1,6 +1,7 @@
 import iconv from "iconv-lite";
 import { dopamineScore } from "./feed-metrics";
 import type { RankedAssetDto } from "./types";
+import { fetchYahooQuoteSummary } from "./yahoo-quote-summary";
 
 const NAVER_HEADERS: HeadersInit = {
   "User-Agent":
@@ -223,22 +224,32 @@ export async function fetchKrStockNameFromNaver(
 }
 
 /**
- * GitHub Actions `refresh-feed-cache` 전용 — 종목 메인 페이지에서 `nameKo` 채움.
- * Vercel 랭킹 API는 여전히 Supabase만 읽고, `locale=ko`일 때 `nameKo`→`name` 매핑만 한다.
+ * 캐시용 kr_stock: 심볼마다 Yahoo `quoteSummary` → `name`(영문 표기), 이어서 네이버 메인 → `nameKo`.
+ * Yahoo 실패 시 `name`은 네이버 급등락 목록에서 온 기존 값 유지.
  */
-export async function enrichKrStockRowsWithNaverMainKoreanNames(
+export async function enrichKrStockRowsDisplayNamesFromYahooAndNaver(
   rows: RankedAssetDto[],
 ): Promise<void> {
   const kr = rows.filter((r) => r.assetClass === "kr_stock");
   if (kr.length === 0) return;
   const syms = [...new Set(kr.map((r) => r.symbol))];
+  const symToYahooName = new Map<string, string>();
   const symToKo = new Map<string, string>();
+
   for (const sym of syms) {
+    const y = await fetchYahooQuoteSummary(sym);
+    const dn = y?.displayName?.trim();
+    if (dn) symToYahooName.set(sym, dn);
+
     const ko = await fetchKrStockNameFromNaver(sym);
     if (ko != null && ko.trim() !== "") symToKo.set(sym, ko.trim());
+
     await new Promise((resolve) => setTimeout(resolve, 90));
   }
+
   for (const r of kr) {
+    const dn = symToYahooName.get(r.symbol);
+    if (dn) r.name = dn;
     const ko = symToKo.get(r.symbol);
     if (ko) r.nameKo = ko;
   }
