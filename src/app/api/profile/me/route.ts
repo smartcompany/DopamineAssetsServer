@@ -107,14 +107,12 @@ export async function GET(request: Request) {
     if (!data) {
       return jsonWithCors({ profile: null });
     }
-    const displayName = (data.display_name as string | null)?.trim();
-    if (!displayName) {
-      return jsonWithCors({ profile: null });
-    }
+    const rowUid = typeof data.uid === "string" && data.uid.length > 0 ? data.uid : uid;
+    const displayName = ((data.display_name as string | null) ?? "").trim();
     const photoUrl = (data.photo_url as string | null)?.trim() || null;
     return jsonWithCors({
       profile: {
-        uid,
+        uid: rowUid,
         displayName,
         photoUrl,
       },
@@ -165,6 +163,24 @@ export async function DELETE(request: Request) {
     }
     if (isMissingTableError(likeErr)) {
       console.warn("[profile/me][DELETE] dopamine_comment_likes missing; skip");
+    }
+
+    // 2b) 관심 종목
+    const { error: favErr } = await supabase
+      .from("dopamine_user_favorite_assets")
+      .delete()
+      .eq("user_uid", uid);
+    if (favErr && !isMissingTableError(favErr)) {
+      console.error(favErr);
+      return jsonWithCors(
+        { error: "supabase_error", detail: favErr.message },
+        { status: 500 },
+      );
+    }
+    if (isMissingTableError(favErr)) {
+      console.warn(
+        "[profile/me][DELETE] dopamine_user_favorite_assets missing; skip",
+      );
     }
 
     // 3) 팔로우/차단 관계 정리 (양방향)
