@@ -28,6 +28,12 @@ export async function POST(request: Request) {
         : "";
   const rawPlatform = typeof o.platform === "string" ? o.platform.trim() : "";
   const platform = PLATFORMS.has(rawPlatform) ? rawPlatform : "unknown";
+  const rawLocale = typeof o.locale === "string" ? o.locale.trim().toLowerCase() : "";
+  const locale = rawLocale.startsWith("en")
+    ? "en"
+    : rawLocale.startsWith("ko")
+      ? "ko"
+      : "en";
 
   if (!fcmToken || fcmToken.length < 10 || fcmToken.length > 4096) {
     return jsonWithCors({ error: "invalid_fcm_token" }, { status: 400 });
@@ -40,6 +46,7 @@ export async function POST(request: Request) {
         uid,
         fcm_token: fcmToken,
         platform,
+        locale,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "uid,fcm_token" },

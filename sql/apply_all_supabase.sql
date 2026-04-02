@@ -200,10 +200,14 @@ create table if not exists public.dopamine_device_push_tokens (
   uid text not null,
   fcm_token text not null,
   platform text not null default 'unknown',
+  locale text not null default 'ko',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint dopamine_push_tokens_platform check (
     platform in ('ios', 'android', 'web', 'unknown')
+  ),
+  constraint dopamine_push_tokens_locale check (
+    locale in ('ko', 'en')
   ),
   constraint dopamine_push_tokens_uid_token unique (uid, fcm_token)
 );

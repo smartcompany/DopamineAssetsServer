@@ -6,10 +6,12 @@ name: Feed cache refresh
 on:
   schedule:
     - cron: "0 * * * *"
+    - cron: "0 0 * * *"
   workflow_dispatch: {}
 
 jobs:
   refresh:
+    if: github.event_name == 'schedule' && github.event.schedule == '0 * * * *'
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -24,3 +26,22 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_KEY }}
         run: npm ci && npm run refresh-feed-cache
+
+  market_daily_push_9am:
+    if: github.event_name == 'schedule' && github.event.schedule == '0 0 * * *'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Trigger /api/cron/market-daily-push
+        env:
+          CRON_API_BASE_URL: ${{ secrets.CRON_API_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_API_BASE_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "Missing CRON_API_BASE_URL or CRON_SECRET"
+            exit 1
+          fi
+          curl -sS -X POST "${CRON_API_BASE_URL}/api/cron/market-daily-push" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            --fail
