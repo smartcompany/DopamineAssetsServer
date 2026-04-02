@@ -164,10 +164,10 @@ export async function POST(request: Request) {
 
       const hasUpDown = upName.length > 0 && downName.length > 0;
       const bodyKo = hasUpDown
-        ? `불타는 종목: ${upName} (${fmtPct(upPct)}).\n 파산 분위기: ${downName} (${fmtPct(downPct)}).`
+        ? `불타는 종목: ${upName} (${fmtPct(upPct)}).\n파산 분위기: ${downName} (${fmtPct(downPct)}).`
         : briefingKo;
       const bodyEn = hasUpDown
-        ? `Burning pick: ${upName} (${fmtPct(upPct)}).\n Crash vibes: ${downName} (${fmtPct(downPct)}).`
+        ? `Burning pick: ${upName} (${fmtPct(upPct)}).\nCrash vibes: ${downName} (${fmtPct(downPct)}).`
         : briefingEn;
 
       const body = preferredLocale === "en"
