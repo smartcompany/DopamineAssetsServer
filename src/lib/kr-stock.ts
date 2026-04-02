@@ -94,3 +94,66 @@ export async function fetchKrStockRowsFromNaver(): Promise<RankedAssetDto[]> {
 
   return [...bySymbol.values()];
 }
+
+function normalizeKrStockCode(symbol: string): string | null {
+  const s = symbol.trim();
+  const m = s.match(/^(\d{6})(?:\.(KS|KQ))?$/i);
+  if (!m) return null;
+  return m[1];
+}
+
+function parseKrStockNameFromNaverHtml(html: string): string | null {
+  // Naver item main page title example:
+  // "계양전기우 : Npay 증권"
+  const title = html
+    .match(/<title[^>]*>\s*([^<]+?)\s*<\/title>/i)?.[1]
+    ?.trim();
+  if (title) {
+    const cleaned = title
+      .split(" : ")[0]
+      .split(" - ")[0]
+      .split("|")[0]
+      .trim();
+    if (cleaned) return cleaned;
+  }
+
+  // Fallback: try to find a token between "종목명" and "종목코드" in the raw HTML.
+  // (HTML 구조가 바뀔 수 있어 폭을 넉넉히 둔 보수적 정규식)
+  const m = html.match(
+    /종목명[\s\S]{0,800}?종목코드[\s\S]{0,200}?/i,
+  );
+  if (m) {
+    const chunk = m[0];
+    // name candidate: last text chunk before "종목코드"
+    const parts = chunk.split(/종목코드/i);
+    if (parts.length >= 2) {
+      const before = parts[0].replace(/<[^>]*>/g, " ").trim();
+      // 마지막 단어/토큰을 사용 (예: "종목명  계양전기우")
+      const tokens = before.split(/\s+/).filter(Boolean);
+      const last = tokens[tokens.length - 1];
+      if (last) return last;
+    }
+  }
+  return null;
+}
+
+/**
+ * Naver Finance 종목 상세(main)에서 한글 종목명을 가져옵니다.
+ * - 입력: `012205.KS`, `012205.KQ` 등
+ * - 출력: "계양전기우" 같은 한글명
+ */
+export async function fetchKrStockNameFromNaver(
+  symbol: string,
+): Promise<string | null> {
+  const code = normalizeKrStockCode(symbol);
+  if (!code) return null;
+
+  const url = `https://finance.naver.com/item/main.naver?code=${code}`;
+  try {
+    const html = await fetchNaverHtml(url);
+    return parseKrStockNameFromNaverHtml(html);
+  } catch (e) {
+    console.error("[kr-stock] failed to fetch name", { symbol, code, e });
+    return null;
+  }
+}

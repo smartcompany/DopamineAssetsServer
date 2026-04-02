@@ -1,6 +1,7 @@
 import { fetchCryptoProfileFromCoinGecko } from "./coingecko-asset-detail";
 import { fetchMoveSummaryKo } from "./asset-move-summary-batch";
 import { THEME_DEFINITIONS } from "./theme-definitions";
+import { fetchKrStockNameFromNaver } from "./kr-stock";
 import type { AssetClass, AssetDetailDto, CommodityKind } from "./types";
 import { fetchYahooQuoteSummary } from "./yahoo-quote-summary";
 
@@ -148,6 +149,18 @@ export async function getAssetDetail(params: {
     }
     displayName = name.trim() || cgProfile?.name || symbol;
   } else {
+    let naverKrName: string | null = null;
+    if (assetClass === "kr_stock") {
+      try {
+        naverKrName = await fetchKrStockNameFromNaver(symbol);
+        if (naverKrName && naverKrName.trim().length > 0) {
+          dataSources.push(`naver_stock_name:${symbol}`);
+        }
+      } catch (e) {
+        console.error("[asset-detail] Naver kr_stock name failed", symbol, e);
+      }
+    }
+
     marketCap = yahoo?.marketCapFmt ?? null;
     marketCapRaw = yahoo?.marketCapRaw ?? null;
     marketCapRank = null;
@@ -158,7 +171,7 @@ export async function getAssetDetail(params: {
     currency = yahoo?.currency ?? null;
     description = yahoo?.description ?? null;
     website = yahoo?.website ?? null;
-    displayName = yahoo?.displayName ?? name ?? symbol;
+    displayName = naverKrName ?? yahoo?.displayName ?? name ?? symbol;
   }
 
   let moveSummaryKo: string | null = null;
