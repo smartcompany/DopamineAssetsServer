@@ -146,22 +146,6 @@ export async function POST(request: Request) {
         continue;
       }
 
-      const { data: already } = await supabase
-        .from("dopamine_market_daily_push_sent")
-        .select("uid")
-        .eq("uid", uid)
-        .eq("day_utc", dayKst)
-        .maybeSingle();
-      if (already) {
-        console.warn("[market-daily-push] skip by already-sent", {
-          dayKst,
-          uid,
-          tokensCount: uniq.length,
-        });
-        skipped += 1;
-        continue;
-      }
-
       const score = localeScoreByUid.get(uid) ?? { ko: 1, en: 0 };
       const preferredLocale = score.en >= score.ko ? "en" : "ko";
 
@@ -189,13 +173,6 @@ export async function POST(request: Request) {
         body,
         data: { type: "market_daily", dayUtc: dayKst },
       });
-      const { error: insErr } = await supabase
-        .from("dopamine_market_daily_push_sent")
-        .insert({ uid, day_utc: dayKst });
-      if (insErr) {
-        const code = (insErr as { code?: string }).code;
-        if (code !== "23505") console.error(insErr);
-      }
       sent += 1;
     }
 
