@@ -96,6 +96,8 @@ export default function DashboardPage() {
   );
   const [hmdLoadError, setHmdLoadError] = useState(false);
   const [hmdSaveLoading, setHmdSaveLoading] = useState(false);
+  /** 푸시 문구 편집 탭: 한국어 / English */
+  const [hmdPushLocale, setHmdPushLocale] = useState<"ko" | "en">("ko");
 
   const fetchTargetDetail = async (
     commentId: string,
@@ -261,6 +263,7 @@ export default function DashboardPage() {
     setReports([]);
     setHmdConfig(null);
     setHmdLoadError(false);
+    setHmdPushLocale("ko");
   };
 
   const saveHotMoverDiscussionConfig = async () => {
@@ -546,89 +549,116 @@ export default function DashboardPage() {
               </div>
 
               <div className="border-t border-amber-200/80 pt-3 mt-3 space-y-2">
-                <p className="text-xs font-medium text-amber-950">
-                  푸시 문구 (이모지 OK · 발송 시 치환)
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-medium text-amber-950">
+                    푸시 문구 (이모지 OK · 발송 시 치환)
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <label
+                      htmlFor="hmd-push-locale"
+                      className="text-xs text-zinc-600 whitespace-nowrap"
+                    >
+                      언어
+                    </label>
+                    <select
+                      id="hmd-push-locale"
+                      value={hmdPushLocale}
+                      onChange={(e) =>
+                        setHmdPushLocale(e.target.value as "ko" | "en")
+                      }
+                      className="rounded border border-zinc-300 px-2 py-1 text-sm text-zinc-800 bg-white focus:border-zinc-500 focus:outline-none"
+                    >
+                      <option value="ko">한국어</option>
+                      <option value="en">English</option>
+                    </select>
+                  </div>
+                </div>
                 <p className="text-xs text-zinc-600 leading-relaxed">
                   <code className="rounded bg-white/70 px-1">{"{name}"}</code>{" "}
-                  종목명(최대 36자),{" "}
+                  종목명,{" "}
                   <code className="rounded bg-white/70 px-1">{"{pct}"}</code>{" "}
-                  등락률(+1.2% 등),{" "}
+                  등락률,{" "}
                   <code className="rounded bg-white/70 px-1">
                     {"{direction}"}
                   </code>{" "}
-                  한국어는 <strong>급등 중</strong>/<strong>급락 중</strong>,
-                  영어는 <strong>surging</strong>/<strong>sliding</strong>.
-                  제목은 약 65자·본문은 약 180자에서 잘릴 수 있습니다.
+                  — KO: 급등 중·급락 중 / EN: surging·sliding. 제목·본문은 발송 시
+                  각각 약 65·180자에서 잘릴 수 있음.
                 </p>
-                <div>
-                  <label className="block text-xs text-zinc-600 mb-1">
-                    제목 (한국어)
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={80}
-                    value={hmdConfig.pushTitleKo}
-                    onChange={(e) =>
-                      setHmdConfig((c) =>
-                        c ? { ...c, pushTitleKo: e.target.value } : c,
-                      )
-                    }
-                    className="w-full rounded border border-zinc-300 px-2 py-1.5 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-zinc-600 mb-1">
-                    제목 (English)
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={80}
-                    value={hmdConfig.pushTitleEn}
-                    onChange={(e) =>
-                      setHmdConfig((c) =>
-                        c ? { ...c, pushTitleEn: e.target.value } : c,
-                      )
-                    }
-                    className="w-full rounded border border-zinc-300 px-2 py-1.5 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-zinc-600 mb-1">
-                    본문 (한국어)
-                  </label>
-                  <textarea
-                    rows={3}
-                    maxLength={320}
-                    value={hmdConfig.pushBodyTemplateKo}
-                    onChange={(e) =>
-                      setHmdConfig((c) =>
-                        c
-                          ? { ...c, pushBodyTemplateKo: e.target.value }
-                          : c,
-                      )
-                    }
-                    className="w-full rounded border border-zinc-300 px-2 py-1.5 text-sm font-normal"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-zinc-600 mb-1">
-                    Body (English)
-                  </label>
-                  <textarea
-                    rows={3}
-                    maxLength={320}
-                    value={hmdConfig.pushBodyTemplateEn}
-                    onChange={(e) =>
-                      setHmdConfig((c) =>
-                        c
-                          ? { ...c, pushBodyTemplateEn: e.target.value }
-                          : c,
-                      )
-                    }
-                    className="w-full rounded border border-zinc-300 px-2 py-1.5 text-sm font-normal"
-                  />
-                </div>
+                {hmdPushLocale === "ko" ? (
+                  <>
+                    <div>
+                      <label className="block text-xs text-zinc-600 mb-1">
+                        제목
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={80}
+                        value={hmdConfig.pushTitleKo}
+                        onChange={(e) =>
+                          setHmdConfig((c) =>
+                            c ? { ...c, pushTitleKo: e.target.value } : c,
+                          )
+                        }
+                        className="w-full rounded border border-zinc-300 px-2 py-1.5 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-zinc-600 mb-1">
+                        본문
+                      </label>
+                      <textarea
+                        rows={3}
+                        maxLength={320}
+                        value={hmdConfig.pushBodyTemplateKo}
+                        onChange={(e) =>
+                          setHmdConfig((c) =>
+                            c
+                              ? { ...c, pushBodyTemplateKo: e.target.value }
+                              : c,
+                          )
+                        }
+                        className="w-full rounded border border-zinc-300 px-2 py-1.5 text-sm font-normal"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <label className="block text-xs text-zinc-600 mb-1">
+                        Title
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={80}
+                        value={hmdConfig.pushTitleEn}
+                        onChange={(e) =>
+                          setHmdConfig((c) =>
+                            c ? { ...c, pushTitleEn: e.target.value } : c,
+                          )
+                        }
+                        className="w-full rounded border border-zinc-300 px-2 py-1.5 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-zinc-600 mb-1">
+                        Body
+                      </label>
+                      <textarea
+                        rows={3}
+                        maxLength={320}
+                        value={hmdConfig.pushBodyTemplateEn}
+                        onChange={(e) =>
+                          setHmdConfig((c) =>
+                            c
+                              ? { ...c, pushBodyTemplateEn: e.target.value }
+                              : c,
+                          )
+                        }
+                        className="w-full rounded border border-zinc-300 px-2 py-1.5 text-sm font-normal"
+                      />
+                    </div>
+                  </>
+                )}
               </div>
 
               <button

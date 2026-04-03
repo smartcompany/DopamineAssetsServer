@@ -53,13 +53,21 @@ export async function POST(request: Request) {
     const discussionConfig = await loadHotMoverDiscussionConfig(supabase);
     const configPayload = configToPayload(discussionConfig);
 
-    const pick = await pickHotMoverDiscussion(supabase, discussionConfig);
+    const { pick, diagnostics } = await pickHotMoverDiscussion(
+      supabase,
+      discussionConfig,
+    );
     if (!pick) {
+      console.log(
+        "[hot-mover-discussion-push] no_candidate",
+        JSON.stringify(diagnostics),
+      );
       return jsonWithCors({
         ok: true,
         skipped: "no_candidate",
         bucket: bucket.toString(),
         discussionConfig: configPayload,
+        diagnostics,
       });
     }
 
@@ -221,6 +229,11 @@ export async function POST(request: Request) {
     console.log("[hot-mover-discussion-push] summary", {
       bucket: bucket.toString(),
       discussionConfig: configPayload,
+      pickDiagnostics: {
+        noPickReason: diagnostics.noPickReason,
+        moverCount: diagnostics.moverCount,
+        activityRowCount: diagnostics.activityRowCount,
+      },
       pick: {
         symbol: pick.symbol,
         assetClass: pick.assetClass,

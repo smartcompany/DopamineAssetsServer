@@ -12,6 +12,40 @@ export type HotMoverDiscussionPick = {
   activityScore: number;
 };
 
+/** 크론/대시보드에서 no_candidate 원인 추적용 */
+export type HotMoverDiscussionDiagnostics = {
+  noPickReason: string;
+  useTimeWindow: boolean;
+  windowHours: number;
+  minThreadComments: number;
+  minRootViewCount: number;
+  upItemsCount: number;
+  downItemsCount: number;
+  moverCount: number;
+  moversPreview: Array<{ symbol: string; assetClass: string; pct: number }>;
+  feedAsOfUp?: string;
+  feedAsOfDown?: string;
+  activityRowCount: number;
+  /** rows 비어 있고 minThreadComments > 0 이면 true */
+  abortedEmptyRowsWithMinGt0: boolean;
+  /** byRoot 가 비어 있지 않은 급등·급락 종목 수 */
+  assetsWithThreadHits: number;
+  /** minThreadComments===0 백필로 최신 루트를 넣은 종목 수 */
+  latestRootBackfillCount: number;
+  qualifyingCount: number;
+  qualifyingPreview: Array<{
+    symbol: string;
+    assetClass: string;
+    score: number;
+    rootIdsInOrder: number;
+  }>;
+  uniqueRootIdsForMeta: number;
+  rootMetaRowCount: number;
+  rootBatchError?: string;
+  /** 최종 루트 검사에서 탈락한 예시(최대 15건) */
+  rejectionSamples: Array<{ rootId: string; reason: string }>;
+};
+
 const MOVER_RANK_LIMIT = 22;
 /** 시간 창 없음일 때 최근 글만 스캔 (DB 부하 방지) */
 const NO_WINDOW_ROW_LIMIT = 8000;
@@ -150,28 +184,26 @@ async function fillLatestRootForMoversWithNoActivity(
     string,
     { mover: MoverRow; byRoot: Map<string, number> }
   >,
-): Promise<void> {
-  const tasks: Promise<void>[] = [];
-  for (const { mover, byRoot } of perAsset.values()) {
-    if (byRoot.size > 0) continue;
-    tasks.push(
-      (async () => {
-        const { data, error } = await supabase
-          .from("dopamine_asset_comments")
-          .select("id")
-          .eq("asset_symbol", mover.symbol)
-          .eq("asset_class", mover.assetClass)
-          .is("parent_id", null)
-          .is("moderation_hidden_at", null)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (error || !data?.id) return;
-        byRoot.set(data.id as string, 1);
-      })(),
-    );
-  }
-  await Promise.all(tasks);
+): Promise<number> {
+  const tasks = [...perAsset.values()]
+    .filter(({ byRoot }) => byRoot.size === 0)
+    .map(async ({ mover, byRoot }) => {
+      const { data, error } = await supabase
+        .from("dopamine_asset_comments")
+        .select("id")
+        .eq("asset_symbol", mover.symbol)
+        .eq("asset_class", mover.assetClass)
+        .is("parent_id", null)
+        .is("moderation_hidden_at", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error || !data?.id) return 0;
+      byRoot.set(data.id as string, 1);
+      return 1;
+    });
+  const results = await Promise.all(tasks);
+  return results.reduce<number>((a, b) => a + b, 0);
 }
 
 type QualifyingAsset = {
@@ -182,13 +214,38 @@ type QualifyingAsset = {
 
 /**
  * 캐시 랭킹 급등·급락 상위 종목 중, 커뮤니티 활동(대시보드 설정)을 만족하는 종목·스레드를 고릅니다.
+ * @returns pick 이 null 이면 diagnostics.noPickReason 과 나머지 필드로 원인 추적.
  */
 export async function pickHotMoverDiscussion(
   supabase: SupabaseClient,
   config: HotMoverDiscussionConfig,
-): Promise<HotMoverDiscussionPick | null> {
+): Promise<{
+  pick: HotMoverDiscussionPick | null;
+  diagnostics: HotMoverDiscussionDiagnostics;
+}> {
   const minComments = config.min_thread_comments;
   const minViews = config.min_root_view_count;
+
+  const diagnostics: HotMoverDiscussionDiagnostics = {
+    noPickReason: "unknown",
+    useTimeWindow: config.use_time_window,
+    windowHours: config.window_hours,
+    minThreadComments: minComments,
+    minRootViewCount: minViews,
+    upItemsCount: 0,
+    downItemsCount: 0,
+    moverCount: 0,
+    moversPreview: [],
+    activityRowCount: 0,
+    abortedEmptyRowsWithMinGt0: false,
+    assetsWithThreadHits: 0,
+    latestRootBackfillCount: 0,
+    qualifyingCount: 0,
+    qualifyingPreview: [],
+    uniqueRootIdsForMeta: 0,
+    rootMetaRowCount: 0,
+    rejectionSamples: [],
+  };
 
   const params = new URLSearchParams({
     limit: String(MOVER_RANK_LIMIT),
@@ -198,15 +255,36 @@ export async function pickHotMoverDiscussion(
     getFeedRankings("up", params),
     getFeedRankings("down", params),
   ]);
+  diagnostics.upItemsCount = upRes.items.length;
+  diagnostics.downItemsCount = downRes.items.length;
+  diagnostics.feedAsOfUp = upRes.asOf;
+  diagnostics.feedAsOfDown = downRes.asOf;
+
   const movers = mergeMovers(upRes.items, downRes.items);
-  if (movers.length === 0) return null;
+  diagnostics.moverCount = movers.length;
+  diagnostics.moversPreview = movers.slice(0, 8).map((m) => ({
+    symbol: m.symbol,
+    assetClass: m.assetClass,
+    pct: m.priceChangePct,
+  }));
+
+  if (movers.length === 0) {
+    diagnostics.noPickReason = "empty_feed_rankings";
+    return { pick: null, diagnostics };
+  }
 
   const orParts = movers.map(
     (m) =>
       `and(asset_symbol.eq.${m.symbol},asset_class.eq.${m.assetClass})`,
   );
   const rows = await fetchMoverActivityRows(supabase, orParts, config);
-  if (rows.length === 0 && minComments > 0) return null;
+  diagnostics.activityRowCount = rows.length;
+
+  if (rows.length === 0 && minComments > 0) {
+    diagnostics.abortedEmptyRowsWithMinGt0 = true;
+    diagnostics.noPickReason = "no_comment_rows_and_min_thread_gt_0";
+    return { pick: null, diagnostics };
+  }
 
   const byId =
     rows.length > 0
@@ -227,17 +305,26 @@ export async function pickHotMoverDiscussion(
     });
   }
 
+  let unresolvedRootRows = 0;
   for (const r of rows) {
     const k = assetKey(r.asset_symbol, r.asset_class);
     const bucket = perAsset.get(k);
     if (!bucket) continue;
     const root = resolveRoot(r.id, byId);
-    if (!root) continue;
+    if (!root) {
+      unresolvedRootRows += 1;
+      continue;
+    }
     bucket.byRoot.set(root, (bucket.byRoot.get(root) ?? 0) + 1);
   }
 
+  diagnostics.assetsWithThreadHits = [...perAsset.values()].filter(
+    (b) => b.byRoot.size > 0,
+  ).length;
+
   if (minComments === 0) {
-    await fillLatestRootForMoversWithNoActivity(supabase, perAsset);
+    diagnostics.latestRootBackfillCount =
+      await fillLatestRootForMoversWithNoActivity(supabase, perAsset);
   }
 
   const qualifying: QualifyingAsset[] = [];
@@ -267,11 +354,44 @@ export async function pickHotMoverDiscussion(
     return bTop - aTop;
   });
 
+  diagnostics.qualifyingCount = qualifying.length;
+  diagnostics.qualifyingPreview = qualifying.slice(0, 6).map((q) => ({
+    symbol: q.mover.symbol,
+    assetClass: q.mover.assetClass,
+    score: q.score,
+    rootIdsInOrder: q.rootsByHits.length,
+  }));
+
   const rootIds = new Set<string>();
   for (const q of qualifying) {
     for (const rid of q.rootsByHits) rootIds.add(rid);
   }
-  if (rootIds.size === 0) return null;
+  diagnostics.uniqueRootIdsForMeta = rootIds.size;
+
+  if (rootIds.size === 0) {
+    diagnostics.noPickReason = "no_qualifying_asset_with_root";
+    return {
+      pick: null,
+      diagnostics: {
+        ...diagnostics,
+        rejectionSamples: [
+          ...(unresolvedRootRows > 0
+            ? [
+                {
+                  rootId: "-",
+                  reason: `activity_rows_had_unresolved_parent_chain count=${unresolvedRootRows}`,
+                },
+              ]
+            : []),
+          {
+            rootId: "-",
+            reason:
+              "no_mover_had_a_root_post_try_community_posts_on_mover_symbols_or_lower_min_thread",
+          },
+        ],
+      },
+    };
+  }
 
   const { data: rootRows, error: rootListErr } = await supabase
     .from("dopamine_asset_comments")
@@ -280,9 +400,16 @@ export async function pickHotMoverDiscussion(
     )
     .in("id", [...rootIds]);
 
-  if (rootListErr || !rootRows?.length) {
+  diagnostics.rootMetaRowCount = rootRows?.length ?? 0;
+  if (rootListErr) {
+    diagnostics.rootBatchError = rootListErr.message;
+    diagnostics.noPickReason = "root_meta_query_failed";
     console.warn("[hot-mover-discussion] root batch", rootListErr);
-    return null;
+    return { pick: null, diagnostics };
+  }
+  if (!rootRows?.length) {
+    diagnostics.noPickReason = "root_meta_empty";
+    return { pick: null, diagnostics };
   }
 
   const metaById = new Map<
@@ -305,32 +432,67 @@ export async function pickHotMoverDiscussion(
     });
   }
 
+  const rejectionSamples: Array<{ rootId: string; reason: string }> = [];
+
+  function noteReject(rootId: string, reason: string) {
+    if (rejectionSamples.length >= 15) return;
+    rejectionSamples.push({ rootId, reason });
+  }
+
   for (const q of qualifying) {
     for (const rid of q.rootsByHits) {
       const meta = metaById.get(rid);
-      if (!meta) continue;
-      if (meta.parent_id != null) continue;
-      if (meta.moderation_hidden_at != null) continue;
+      if (!meta) {
+        noteReject(rid, "no_meta_row");
+        continue;
+      }
+      if (meta.parent_id != null) {
+        noteReject(rid, "not_root_parent_id_set");
+        continue;
+      }
+      if (meta.moderation_hidden_at != null) {
+        noteReject(rid, "moderation_hidden");
+        continue;
+      }
       if (
         meta.asset_symbol !== q.mover.symbol ||
         meta.asset_class !== q.mover.assetClass
       ) {
+        noteReject(
+          rid,
+          `asset_mismatch meta=${meta.asset_symbol}/${meta.asset_class} mover=${q.mover.symbol}/${q.mover.assetClass}`,
+        );
         continue;
       }
-      if (meta.view_count < minViews) continue;
+      if (meta.view_count < minViews) {
+        noteReject(
+          rid,
+          `view_count ${meta.view_count} < min ${minViews}`,
+        );
+        continue;
+      }
 
+      diagnostics.noPickReason = "picked";
       return {
-        symbol: q.mover.symbol,
-        assetClass: q.mover.assetClass,
-        displayName: q.mover.name,
-        priceChangePct: q.mover.priceChangePct,
-        rootCommentId: rid,
-        activityScore: q.score,
+        pick: {
+          symbol: q.mover.symbol,
+          assetClass: q.mover.assetClass,
+          displayName: q.mover.name,
+          priceChangePct: q.mover.priceChangePct,
+          rootCommentId: rid,
+          activityScore: q.score,
+        },
+        diagnostics: {
+          ...diagnostics,
+          rejectionSamples,
+        },
       };
     }
   }
 
-  return null;
+  diagnostics.rejectionSamples = rejectionSamples;
+  diagnostics.noPickReason = "all_candidate_roots_failed_filters";
+  return { pick: null, diagnostics };
 }
 
 export function currentHotMoverDiscussionBucket(): bigint {
