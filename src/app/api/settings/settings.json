@@ -9,14 +9,14 @@
   ],
   "ref": {
     "ios": {
-      "rewarded_ad": "ca-app-pub-5520596727761259/3786642276",
       "rewarded_test": "ca-app-pub-3940256099942544/1712485313",
-      "initial_ad": "ca-app-pub-5520596727761259/4588988406"
+      "rewarded_ad": "ca-app-pub-5520596727761259/9531931774",
+      "initial_ad": "ca-app-pub-5520596727761259/2035547726"
     },
     "android": {
-      "rewarded_ad": "ca-app-pub-5520596727761259/3491128803",
       "rewarded_test": "ca-app-pub-3940256099942544/5224354917",
-      "initial_ad": "ca-app-pub-5520596727761259/8504182682"
+      "rewarded_ad": "ca-app-pub-5520596727761259/1789173121",
+      "initial_ad": "ca-app-pub-5520596727761259/8957945655"
     }
   },
   "down_load_url": ""
