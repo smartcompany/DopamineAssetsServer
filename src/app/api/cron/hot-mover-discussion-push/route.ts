@@ -1,6 +1,7 @@
 import { jsonWithCors } from "@/lib/cors";
 import {
   configToPayload,
+  interpolateHotMoverPushTemplate,
   loadHotMoverDiscussionConfig,
 } from "@/lib/hot-mover-discussion-config";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -168,30 +169,45 @@ export async function POST(request: Request) {
 
       const score = localeScoreByUid.get(uid) ?? { ko: 1, en: 0 };
       const preferredLocale = score.en >= score.ko ? "en" : "ko";
-      const upDown =
-        pick.priceChangePct >= 0
-          ? preferredLocale === "en"
-            ? "surging"
-            : "급등"
-          : preferredLocale === "en"
-            ? "sliding"
-            : "급락";
+      const name = truncate(pick.displayName, 36);
+      const pct = fmtPct(pick.priceChangePct);
+      const up = pick.priceChangePct >= 0;
 
-      const title =
-        preferredLocale === "en"
-          ? "Hot discussion"
-          : "지금 뜨는 토론";
+      const directionKo = up ? "급등 중" : "급락 중";
+      const directionEn = up ? "surging" : "sliding";
 
-      const body =
+      const titleRaw =
         preferredLocale === "en"
-          ? `${truncate(pick.displayName, 36)} is ${upDown} (${fmtPct(pick.priceChangePct)}) — lively thread in Community.`
-          : `${truncate(pick.displayName, 36)} ${upDown} 중 (${fmtPct(pick.priceChangePct)}) · 커뮤니티에서 활발해요.`;
+          ? interpolateHotMoverPushTemplate(discussionConfig.push_title_en, {
+              name,
+              pct,
+              direction: directionEn,
+            })
+          : interpolateHotMoverPushTemplate(discussionConfig.push_title_ko, {
+              name,
+              pct,
+              direction: directionKo,
+            });
+
+      const bodyRaw =
+        preferredLocale === "en"
+          ? interpolateHotMoverPushTemplate(
+              discussionConfig.push_body_template_en,
+              { name, pct, direction: directionEn },
+            )
+          : interpolateHotMoverPushTemplate(
+              discussionConfig.push_body_template_ko,
+              { name, pct, direction: directionKo },
+            );
+
+      const title = truncate(titleRaw, 65);
+      const body = truncate(bodyRaw, 180);
 
       attempted += 1;
       await sendFcmToTokens({
         tokens: uniq,
         title,
-        body: truncate(body, 180),
+        body,
         data: {
           type: "hot_mover_discussion",
           symbol: pick.symbol,

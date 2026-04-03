@@ -143,6 +143,37 @@ async function fetchMoverActivityRows(
   return (data ?? []) as WindowRow[];
 }
 
+/** `min_thread_comments === 0`일 때, 집계 창에 잡힌 활동이 없는 급등·급락 종목은 최신 루트 글 1건을 후보로 넣습니다. */
+async function fillLatestRootForMoversWithNoActivity(
+  supabase: SupabaseClient,
+  perAsset: Map<
+    string,
+    { mover: MoverRow; byRoot: Map<string, number> }
+  >,
+): Promise<void> {
+  const tasks: Promise<void>[] = [];
+  for (const { mover, byRoot } of perAsset.values()) {
+    if (byRoot.size > 0) continue;
+    tasks.push(
+      (async () => {
+        const { data, error } = await supabase
+          .from("dopamine_asset_comments")
+          .select("id")
+          .eq("asset_symbol", mover.symbol)
+          .eq("asset_class", mover.assetClass)
+          .is("parent_id", null)
+          .is("moderation_hidden_at", null)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (error || !data?.id) return;
+        byRoot.set(data.id as string, 1);
+      })(),
+    );
+  }
+  await Promise.all(tasks);
+}
+
 type QualifyingAsset = {
   mover: MoverRow;
   score: number;
@@ -175,12 +206,15 @@ export async function pickHotMoverDiscussion(
       `and(asset_symbol.eq.${m.symbol},asset_class.eq.${m.assetClass})`,
   );
   const rows = await fetchMoverActivityRows(supabase, orParts, config);
-  if (rows.length < minComments) return null;
+  if (rows.length === 0 && minComments > 0) return null;
 
-  const byId = await fetchCommentChain(
-    supabase,
-    rows.map((r) => r.id),
-  );
+  const byId =
+    rows.length > 0
+      ? await fetchCommentChain(
+          supabase,
+          rows.map((r) => r.id),
+        )
+      : new Map<string, IdRow>();
 
   const perAsset = new Map<
     string,
@@ -202,14 +236,19 @@ export async function pickHotMoverDiscussion(
     bucket.byRoot.set(root, (bucket.byRoot.get(root) ?? 0) + 1);
   }
 
+  if (minComments === 0) {
+    await fillLatestRootForMoversWithNoActivity(supabase, perAsset);
+  }
+
   const qualifying: QualifyingAsset[] = [];
   for (const { mover, byRoot } of perAsset.values()) {
     let score = 0;
     for (const n of byRoot.values()) score += n;
-    if (score < minComments) continue;
+    if (minComments > 0 && score < minComments) continue;
     const rootsByHits = [...byRoot.entries()]
       .sort((a, b) => b[1] - a[1])
       .map(([id]) => id);
+    if (rootsByHits.length === 0) continue;
     qualifying.push({ mover, score, rootsByHits });
   }
 

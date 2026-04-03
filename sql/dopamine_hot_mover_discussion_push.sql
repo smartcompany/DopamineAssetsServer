@@ -32,7 +32,7 @@ create table if not exists public.dopamine_hot_mover_discussion_config (
   window_hours integer not null default 4
     constraint dopamine_hmdc_window_hours check (window_hours between 1 and 8760),
   min_thread_comments integer not null default 2
-    constraint dopamine_hmdc_min_comments check (min_thread_comments between 1 and 500),
+    constraint dopamine_hmdc_min_comments check (min_thread_comments between 0 and 500),
   min_root_view_count integer not null default 0
     constraint dopamine_hmdc_min_views check (min_root_view_count between 0 and 99999999),
   updated_at timestamptz not null default now()
@@ -42,3 +42,19 @@ alter table public.dopamine_hot_mover_discussion_config enable row level securit
 
 insert into public.dopamine_hot_mover_discussion_config (id) values (1)
 on conflict (id) do nothing;
+
+-- 이미 1~500 제약으로 만들어 둔 DB: 0 허용으로 완화
+alter table public.dopamine_hot_mover_discussion_config
+  drop constraint if exists dopamine_hmdc_min_comments;
+alter table public.dopamine_hot_mover_discussion_config
+  add constraint dopamine_hmdc_min_comments check (min_thread_comments between 0 and 500);
+
+-- 푸시 제목·본문 템플릿 (대시보드 편집, {name} {pct} {direction})
+alter table public.dopamine_hot_mover_discussion_config
+  add column if not exists push_title_ko text not null default '🔥 지금 뜨는 토론';
+alter table public.dopamine_hot_mover_discussion_config
+  add column if not exists push_title_en text not null default '🔥 Heating up';
+alter table public.dopamine_hot_mover_discussion_config
+  add column if not exists push_body_template_ko text not null default $hmdc_body_ko$💬 {name} {direction} ({pct}) · 커뮤니티 온도 미쳤어요 👀 지금 보러 와요!$hmdc_body_ko$;
+alter table public.dopamine_hot_mover_discussion_config
+  add column if not exists push_body_template_en text not null default $hmdc_body_en$💬 {name} is {direction} ({pct}) — Community's buzzing 👀 Tap to see what's up!$hmdc_body_en$;
