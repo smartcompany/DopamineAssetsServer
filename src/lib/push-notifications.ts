@@ -11,6 +11,7 @@ export type PushPrefs = {
   market_daily_brief: boolean;
   market_watchlist: boolean;
   market_theme: boolean;
+  hot_mover_discussion: boolean;
 };
 
 const defaultPrefs: PushPrefs = {
@@ -22,6 +23,7 @@ const defaultPrefs: PushPrefs = {
   market_daily_brief: true,
   market_watchlist: true,
   market_theme: true,
+  hot_mover_discussion: true,
 };
 
 export async function loadPushPrefs(
@@ -31,7 +33,7 @@ export async function loadPushPrefs(
   const { data } = await supabase
     .from("dopamine_user_push_prefs")
     .select(
-      "master_enabled, social_reply, social_like, followed_new_post, moderation_notice, market_daily_brief, market_watchlist, market_theme",
+      "master_enabled, social_reply, social_like, followed_new_post, moderation_notice, market_daily_brief, market_watchlist, market_theme, hot_mover_discussion",
     )
     .eq("uid", uid)
     .maybeSingle();
@@ -45,6 +47,9 @@ export async function loadPushPrefs(
     market_daily_brief: data.market_daily_brief !== false,
     market_watchlist: data.market_watchlist !== false,
     market_theme: data.market_theme !== false,
+    hot_mover_discussion:
+      (data as { hot_mover_discussion?: boolean }).hot_mover_discussion !==
+      false,
   };
 }
 

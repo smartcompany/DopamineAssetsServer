@@ -28,6 +28,14 @@ type TargetDetail = {
   image_urls: string[];
 };
 
+/** 급등·급락 토론 푸시 — GET/PUT /api/dashboard/hot-mover-discussion-config */
+type HotMoverDiscussionForm = {
+  useTimeWindow: boolean;
+  windowHours: number;
+  minThreadComments: number;
+  minRootViewCount: number;
+};
+
 function getVerdictLabel(v: string | null): string {
   if (!v) return "-";
   const map: Record<string, string> = {
@@ -63,6 +71,12 @@ export default function DashboardPage() {
   const [filter24h, setFilter24h] = useState<"all" | "over24" | "within24">(
     "all",
   );
+
+  const [hmdConfig, setHmdConfig] = useState<HotMoverDiscussionForm | null>(
+    null,
+  );
+  const [hmdLoadError, setHmdLoadError] = useState(false);
+  const [hmdSaveLoading, setHmdSaveLoading] = useState(false);
 
   const fetchTargetDetail = async (
     commentId: string,
@@ -154,6 +168,34 @@ export default function DashboardPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (authenticated !== true) return;
+    let cancelled = false;
+    void (async () => {
+      setHmdLoadError(false);
+      try {
+        const res = await fetch(
+          `${API}/api/dashboard/hot-mover-discussion-config`,
+          { credentials: "include" },
+        );
+        if (!res.ok) {
+          if (!cancelled) setHmdLoadError(true);
+          return;
+        }
+        const data = (await res.json()) as {
+          config?: HotMoverDiscussionForm;
+        };
+        if (!cancelled && data.config) setHmdConfig(data.config);
+        else if (!cancelled) setHmdLoadError(true);
+      } catch {
+        if (!cancelled) setHmdLoadError(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authenticated]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError("");
@@ -185,6 +227,36 @@ export default function DashboardPage() {
     });
     setAuthenticated(false);
     setReports([]);
+    setHmdConfig(null);
+    setHmdLoadError(false);
+  };
+
+  const saveHotMoverDiscussionConfig = async () => {
+    if (!hmdConfig) return;
+    setHmdSaveLoading(true);
+    try {
+      const res = await fetch(
+        `${API}/api/dashboard/hot-mover-discussion-config`,
+        {
+          method: "PUT",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(hmdConfig),
+        },
+      );
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        config?: HotMoverDiscussionForm;
+      };
+      if (!res.ok) {
+        alert(data.error || "저장에 실패했습니다.");
+        return;
+      }
+      if (data.config) setHmdConfig(data.config);
+      alert("급등·급락 토론 푸시 조건을 저장했습니다.");
+    } finally {
+      setHmdSaveLoading(false);
+    }
   };
 
   const handleUpdateStatus = async () => {
@@ -296,9 +368,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-zinc-100">
       <header className="bg-white border-b border-zinc-200 px-4 py-3 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-zinc-800">
-          신고 관리 대시보드
-        </h1>
+        <h1 className="text-lg font-semibold text-zinc-800">관리 대시보드</h1>
         <button
           type="button"
           onClick={handleLogout}
@@ -309,6 +379,139 @@ export default function DashboardPage() {
       </header>
 
       <main className="p-4 max-w-7xl mx-auto">
+        <section className="mb-6 rounded-xl border border-amber-200 bg-amber-50/90 p-4 shadow-sm">
+          <h2 className="text-base font-semibold text-amber-950 mb-1">
+            급등·급락 토론 푸시 (4시간 크론)
+          </h2>
+          <p className="text-xs text-amber-900/80 mb-4">
+            조건은 Supabase{" "}
+            <code className="rounded bg-amber-100/80 px-1">
+              dopamine_hot_mover_discussion_config
+            </code>{" "}
+            에 저장됩니다. 시간 창을 끄면 급등·급락 후보 종목에 대해{" "}
+            <strong>최근 댓글 약 8,000건</strong>만 스캔합니다(부하 한도).
+          </p>
+          {hmdLoadError && (
+            <p className="text-sm text-red-700 mb-2">
+              설정을 불러오지 못했습니다. DB 마이그레이션(설정 테이블·view_count
+              컬럼)을 적용했는지 확인하세요.
+            </p>
+          )}
+          {hmdConfig && (
+            <div className="space-y-3 text-sm text-zinc-800">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={hmdConfig.useTimeWindow}
+                  onChange={(e) =>
+                    setHmdConfig((c) =>
+                      c
+                        ? { ...c, useTimeWindow: e.target.checked }
+                        : c,
+                    )
+                  }
+                  className="rounded border-zinc-400"
+                />
+                <span>최근 N시간 안의 글·댓글·답글만 집계</span>
+              </label>
+              <div className="flex flex-wrap items-center gap-2 pl-6">
+                <span className="text-zinc-600">집계 시간 (시간)</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={8760}
+                  disabled={!hmdConfig.useTimeWindow}
+                  value={hmdConfig.windowHours}
+                  onChange={(e) => {
+                    const n = Number.parseInt(e.target.value, 10);
+                    setHmdConfig((c) =>
+                      c
+                        ? {
+                            ...c,
+                            windowHours: Number.isFinite(n)
+                              ? Math.min(8760, Math.max(1, n))
+                              : c.windowHours,
+                          }
+                        : c,
+                    );
+                  }}
+                  className="w-24 rounded border border-zinc-300 px-2 py-1 disabled:opacity-50"
+                />
+                <span className="text-xs text-zinc-500">
+                  (끄면 위 숫자는 무시)
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-zinc-600 min-w-[200px]">
+                  종목당 글+댓글+답글 합계 ≥
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  max={500}
+                  value={hmdConfig.minThreadComments}
+                  onChange={(e) => {
+                    const n = Number.parseInt(e.target.value, 10);
+                    setHmdConfig((c) =>
+                      c
+                        ? {
+                            ...c,
+                            minThreadComments: Number.isFinite(n)
+                              ? Math.min(500, Math.max(1, n))
+                              : c.minThreadComments,
+                          }
+                        : c,
+                    );
+                  }}
+                  className="w-20 rounded border border-zinc-300 px-2 py-1"
+                />
+                <span className="text-xs text-zinc-500">
+                  루트 스레드 기준으로 묶어 셉니다.
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-zinc-600 min-w-[200px]">
+                  루트 글 조회수 ≥
+                </span>
+                <input
+                  type="number"
+                  min={0}
+                  max={99999999}
+                  value={hmdConfig.minRootViewCount}
+                  onChange={(e) => {
+                    const n = Number.parseInt(e.target.value, 10);
+                    setHmdConfig((c) =>
+                      c
+                        ? {
+                            ...c,
+                            minRootViewCount: Number.isFinite(n)
+                              ? Math.min(99_999_999, Math.max(0, n))
+                              : c.minRootViewCount,
+                          }
+                        : c,
+                    );
+                  }}
+                  className="w-28 rounded border border-zinc-300 px-2 py-1"
+                />
+                <span className="text-xs text-zinc-500">
+                  0이면 조회수 조건 없음. 앱에서 글 상세 진입 시 +1.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => void saveHotMoverDiscussionConfig()}
+                disabled={hmdSaveLoading}
+                className="mt-2 rounded-lg bg-amber-800 text-white px-4 py-2 text-sm font-medium hover:bg-amber-900 disabled:opacity-50"
+              >
+                {hmdSaveLoading ? "저장 중…" : "조건 저장"}
+              </button>
+            </div>
+          )}
+          {!hmdConfig && !hmdLoadError && (
+            <p className="text-sm text-zinc-500">설정 불러오는 중…</p>
+          )}
+        </section>
+
         <p className="text-sm text-zinc-600 mb-3">
           AI가 <strong>hide_post</strong>로 판정하면 해당 글에 숨김 플래그가
           붙어 앱 사용자에게는 보이지 않습니다(삭제 아님). 오판이면 아래

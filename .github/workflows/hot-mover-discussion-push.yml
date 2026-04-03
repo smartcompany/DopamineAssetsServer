@@ -1,0 +1,26 @@
+# 급등·급락 + 활발 토론 푸시 (4시간마다 UTC)
+name: Hot mover discussion push (every 4h UTC)
+
+on:
+  schedule:
+    - cron: "0 */4 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  hot_mover_discussion_push:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Trigger /api/cron/hot-mover-discussion-push
+        env:
+          CRON_API_BASE_URL: ${{ secrets.CRON_API_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_API_BASE_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "Missing CRON_API_BASE_URL or CRON_SECRET"
+            exit 1
+          fi
+          curl -sS -X POST "${CRON_API_BASE_URL}/api/cron/hot-mover-discussion-push" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            --fail

@@ -12,6 +12,7 @@ const BOOL_KEYS = [
   "marketDailyBrief",
   "marketWatchlist",
   "marketTheme",
+  "hotMoverDiscussion",
 ] as const;
 
 type BoolKey = (typeof BOOL_KEYS)[number];
@@ -25,6 +26,7 @@ const DB_MAP: Record<BoolKey, string> = {
   marketDailyBrief: "market_daily_brief",
   marketWatchlist: "market_watchlist",
   marketTheme: "market_theme",
+  hotMoverDiscussion: "hot_mover_discussion",
 };
 
 export async function GET(request: Request) {
@@ -46,6 +48,7 @@ export async function GET(request: Request) {
         marketDailyBrief: p.market_daily_brief,
         marketWatchlist: p.market_watchlist,
         marketTheme: p.market_theme,
+        hotMoverDiscussion: p.hot_mover_discussion,
       },
     });
   } catch (e) {
@@ -97,6 +100,7 @@ export async function PATCH(request: Request) {
       market_daily_brief: cur.market_daily_brief,
       market_watchlist: cur.market_watchlist,
       market_theme: cur.market_theme,
+      hot_mover_discussion: cur.hot_mover_discussion,
       updated_at: new Date().toISOString(),
     };
     for (const k of BOOL_KEYS) {
@@ -125,6 +129,7 @@ export async function PATCH(request: Request) {
         marketDailyBrief: p.market_daily_brief,
         marketWatchlist: p.market_watchlist,
         marketTheme: p.market_theme,
+        hotMoverDiscussion: p.hot_mover_discussion,
       },
     });
   } catch (e) {
