@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>데이터 안내 및 면책 | Dopamine Assets</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+        "Apple SD Gothic Neo", "Noto Sans", "Noto Sans KR", sans-serif;
+      line-height: 1.65;
+      margin: 0;
+      padding: 0;
+      color: #1a1a1a;
+      background: #fafafa;
+    }
+    header {
+      position: sticky;
+      top: 0;
+      background: #fafafa;
+      border-bottom: 1px solid #e5e5e5;
+      padding: 12px 16px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      z-index: 10;
+    }
+    header a {
+      text-decoration: none;
+      color: #444;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+    }
+    header a.active { background: #eee; font-weight: 600; }
+    main { max-width: 720px; margin: 0 auto; padding: 20px 16px 48px; }
+    h1 { font-size: 1.35rem; margin: 0 0 12px; }
+    h2 { font-size: 1.05rem; margin: 28px 0 10px; color: #111; }
+    p { margin: 0 0 12px; color: #333; }
+    ul { margin: 0 0 12px; padding-left: 1.25rem; color: #333; }
+    li { margin-bottom: 6px; }
+    .note {
+      background: #f0f4f8;
+      border: 1px solid #dde4ec;
+      padding: 12px 14px;
+      border-radius: 10px;
+      margin-bottom: 16px;
+      font-size: 14px;
+    }
+    footer {
+      margin-top: 36px;
+      padding-top: 16px;
+      border-top: 1px solid #e5e5e5;
+      font-size: 12px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <strong style="font-size:15px">Dopamine Assets</strong>
+    <div style="flex:1"></div>
+    <a href="#ko" id="btn-ko" class="active">한국어</a>
+    <a href="#en" id="btn-en">English</a>
+  </header>
+
+  <main>
+    <section id="ko" aria-label="한국어">
+      <h1>데이터 안내 및 면책</h1>
+      <div class="note">
+        본 앱에서 보여 주는 시세·랭킹·차트·뉴스·기업 정보 등은 <strong>제3자 데이터 제공자</strong> 및 공개 소스를 통해 제공됩니다. 제공 시점·정확성·완전성을 보장하지 않습니다.
+      </div>
+
+      <h2>1. 타사 데이터 및 콘텐츠</h2>
+      <ul>
+        <li>시장 가격, 등락률, 차트, 일부 기업 프로필 등은 Yahoo Finance, 네이버 금융 등 <strong>외부 데이터 소스</strong>를 기반으로 할 수 있습니다.</li>
+        <li>뉴스는 RSS·뉴스 API 등을 통해 수집·표시되며, 기사 본문·저작권은 각 언론 및 원사이트에 귀속됩니다.</li>
+        <li>앱은 위 데이터를 <strong>정보 제공 목적</strong>으로 표시하며, 각 제공자의 이용 조건을 준수합니다.</li>
+      </ul>
+
+      <h2>2. 투자·거래 관련 면책</h2>
+      <ul>
+        <li>앱의 정보는 <strong>투자 권유·매매 권고가 아닙니다.</strong></li>
+        <li>투자 결정은 본인 책임 하에 하시고, 필요 시 전문가·공시·공식 자료를 확인하시기 바랍니다.</li>
+        <li>과거·현재 시세 통계는 미래 수익을 보장하지 않습니다.</li>
+      </ul>
+
+      <h2>3. 커뮤니티</h2>
+      <p>게시글·댓글은 <strong>이용자가 작성한 내용</strong>으로, 앱 운영자의 공식 의견이 아닙니다. 커뮤니티 내용을 정보·투자 판단의 근거로 삼지 마시기 바랍니다.</p>
+
+      <h2>4. 개인정보</h2>
+      <p>개인정보의 수집·이용에 관해서는 앱 스토어에 게시된 <strong>개인정보 처리방침</strong>을 참고해 주세요.</p>
+
+      <footer>최종 수정: 2026-04-03 · Dopamine Assets</footer>
+    </section>
+
+    <section id="en" aria-label="English" style="display: none">
+      <h1>Data sources &amp; disclaimers</h1>
+      <div class="note">
+        Quotes, rankings, charts, news, and company information may come from <strong>third-party data providers</strong> and public sources. We do not guarantee timeliness, accuracy, or completeness.
+      </div>
+
+      <h2>1. Third-party data and content</h2>
+      <ul>
+        <li>Market prices, percentage changes, charts, and parts of company profiles may rely on external sources such as Yahoo Finance and Naver Finance.</li>
+        <li>News items are aggregated via RSS/news APIs; article text and rights belong to the original publishers.</li>
+        <li>We display this material for <strong>informational purposes</strong> and aim to comply with applicable provider terms.</li>
+      </ul>
+
+      <h2>2. Not investment advice</h2>
+      <ul>
+        <li>Nothing in the app is <strong>investment advice</strong> or a recommendation to buy or sell any security or asset.</li>
+        <li>You are solely responsible for investment decisions; verify facts with official disclosures and professionals when needed.</li>
+        <li>Past or current market data does not guarantee future results.</li>
+      </ul>
+
+      <h2>3. Community content</h2>
+      <p>Posts and comments are <strong>user-generated</strong> and are not official statements by the app operator. Do not rely on community content as a basis for trading decisions.</p>
+
+      <h2>4. Privacy</h2>
+      <p>For how we handle personal data, see the <strong>Privacy Policy</strong> linked from the app store listing.</p>
+
+      <footer>Last updated: 2026-04-03 · Dopamine Assets</footer>
+    </section>
+  </main>
+
+  <script>
+    function updateLang() {
+      var hash = window.location.hash || "#ko";
+      document.querySelectorAll('header a[href^="#"]').forEach(function (a) {
+        a.classList.remove("active");
+      });
+      if (hash.indexOf("#en") === 0) {
+        document.getElementById("btn-en").classList.add("active");
+      } else {
+        document.getElementById("btn-ko").classList.add("active");
+      }
+      document.getElementById("ko").style.display = hash.indexOf("#en") === 0 ? "none" : "block";
+      document.getElementById("en").style.display = hash.indexOf("#en") === 0 ? "block" : "none";
+    }
+    window.addEventListener("hashchange", updateLang);
+    updateLang();
+  </script>
+</body>
+</html>
