@@ -2,6 +2,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { ensureFirebaseAdmin } from "@/lib/firebase-admin-app";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
+/** `dopamine_device_push_tokens.locale` 또는 미존재 시 푸시 문구 언어 (uid당 1행). */
+export function pushLangFromDeviceLocale(
+  locale: string | undefined,
+): "ko" | "en" {
+  const raw = typeof locale === "string" ? locale.trim().toLowerCase() : "";
+  return raw.startsWith("en") ? "en" : "ko";
+}
+
 export type PushPrefs = {
   master_enabled: boolean;
   social_reply: boolean;

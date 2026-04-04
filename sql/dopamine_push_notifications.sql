@@ -1,8 +1,7 @@
 -- 푸시 알림 (FCM). apply_all_supabase.sql 9절과 동일 — 단독 적용용.
 
 create table if not exists public.dopamine_device_push_tokens (
-  id uuid primary key default gen_random_uuid(),
-  uid text not null,
+  uid text primary key,
   fcm_token text not null,
   platform text not null default 'unknown',
   locale text not null default 'ko',
@@ -13,12 +12,8 @@ create table if not exists public.dopamine_device_push_tokens (
   ),
   constraint dopamine_push_tokens_locale check (
     locale in ('ko', 'en')
-  ),
-  constraint dopamine_push_tokens_uid_token unique (uid, fcm_token)
+  )
 );
-
-create index if not exists dopamine_push_tokens_uid_idx
-  on public.dopamine_device_push_tokens (uid);
 
 alter table public.dopamine_device_push_tokens enable row level security;
 

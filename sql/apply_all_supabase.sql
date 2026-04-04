@@ -196,8 +196,7 @@ create index if not exists dopamine_move_summaries_lookup_idx
 -- 9) 푸시 알림 (FCM 토큰·설정·일일 브리프 중복 방지)
 -- ---------------------------------------------------------------------------
 create table if not exists public.dopamine_device_push_tokens (
-  id uuid primary key default gen_random_uuid(),
-  uid text not null,
+  uid text primary key,
   fcm_token text not null,
   platform text not null default 'unknown',
   locale text not null default 'ko',
@@ -208,12 +207,8 @@ create table if not exists public.dopamine_device_push_tokens (
   ),
   constraint dopamine_push_tokens_locale check (
     locale in ('ko', 'en')
-  ),
-  constraint dopamine_push_tokens_uid_token unique (uid, fcm_token)
+  )
 );
-
-create index if not exists dopamine_push_tokens_uid_idx
-  on public.dopamine_device_push_tokens (uid);
 
 alter table public.dopamine_device_push_tokens enable row level security;
 

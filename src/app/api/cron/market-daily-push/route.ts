@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { getFeedRankings } from "@/lib/feed-rankings-service";
 import {
   loadPushPrefs,
+  pushLangFromDeviceLocale,
   sendFcmToTokens,
 } from "@/lib/push-notifications";
 
@@ -111,36 +112,27 @@ export async function POST(request: Request) {
       }>;
     }
 
-    const byUid = new Map<string, string[]>();
-    const localeScoreByUid = new Map<string, { ko: number; en: number }>();
+    const byUid = new Map<
+      string,
+      { fcm_token: string; pushLang: "ko" | "en" }
+    >();
     for (const r of tokenRows ?? []) {
       const u = r.uid as string;
       const t = r.fcm_token as string;
       if (!u || !t) continue;
-      const arr = byUid.get(u) ?? [];
-      arr.push(t);
-      byUid.set(u, arr);
-
-      const rawLocale = typeof r.locale === "string" ? r.locale : "";
-      const loc = rawLocale.trim().toLowerCase().startsWith("en")
-        ? "en"
-        : "ko";
-      const score = localeScoreByUid.get(u) ?? { ko: 0, en: 0 };
-      if (loc === "en") score.en += 1;
-      else score.ko += 1;
-      localeScoreByUid.set(u, score);
+      byUid.set(u, {
+        fcm_token: t,
+        pushLang: pushLangFromDeviceLocale(r.locale),
+      });
     }
 
     let attempted = 0;
     let sent = 0;
     let skipped = 0;
-    const totalTokenCount = [...byUid.values()].reduce(
-      (acc, arr) => acc + (arr?.length ?? 0),
-      0,
-    );
+    const totalTokenCount = byUid.size;
 
-    for (const [uid, tokens] of byUid) {
-      const uniq = [...new Set(tokens)];
+    for (const [uid, row] of byUid) {
+      const tokens = [row.fcm_token];
       const prefs = await loadPushPrefs(supabase, uid);
       if (!prefs.master_enabled || !prefs.market_daily_brief) {
         console.warn("[market-daily-push] skip by prefs", {
@@ -148,14 +140,13 @@ export async function POST(request: Request) {
           uid,
           masterEnabled: prefs.master_enabled,
           marketDailyBrief: prefs.market_daily_brief,
-          tokensCount: uniq.length,
+          tokensCount: tokens.length,
         });
         skipped += 1;
         continue;
       }
 
-      const score = localeScoreByUid.get(uid) ?? { ko: 1, en: 0 };
-      const preferredLocale = score.en >= score.ko ? "en" : "ko";
+      const preferredLocale = row.pushLang;
 
       const title =
         preferredLocale === "en"
@@ -176,7 +167,7 @@ export async function POST(request: Request) {
 
       attempted += 1;
       await sendFcmToTokens({
-        tokens: uniq,
+        tokens,
         title,
         body,
         data: { type: "market_daily", dayUtc: dayKst },

@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     ? "en"
     : rawLocale.startsWith("ko")
       ? "ko"
-      : "en";
+      : "ko";
 
   if (!fcmToken || fcmToken.length < 10 || fcmToken.length > 4096) {
     return jsonWithCors({ error: "invalid_fcm_token" }, { status: 400 });
@@ -41,6 +41,16 @@ export async function POST(request: Request) {
 
   try {
     const supabase = getSupabaseAdmin();
+    // 동일 FCM 토큰이 다른 uid에 남아 있으면 크론이 uid마다 같은 기기로 푸시를 여러 번 보냄(로케일만 다르게 보일 수 있음).
+    const { error: delOtherErr } = await supabase
+      .from("dopamine_device_push_tokens")
+      .delete()
+      .eq("fcm_token", fcmToken)
+      .neq("uid", uid);
+    if (delOtherErr) {
+      console.error("[push-token] delete other uids for token failed", delOtherErr);
+    }
+
     const { error } = await supabase.from("dopamine_device_push_tokens").upsert(
       {
         uid,
@@ -49,7 +59,7 @@ export async function POST(request: Request) {
         locale,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "uid,fcm_token" },
+      { onConflict: "uid" },
     );
     if (error) {
       console.error("[push-token] supabase upsert failed", error);
