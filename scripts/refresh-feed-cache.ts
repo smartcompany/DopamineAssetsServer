@@ -24,7 +24,6 @@ import { THEME_DEFINITIONS } from "../src/lib/theme-definitions";
 import { getThemeAverageOhlcBars } from "../src/lib/theme-chart-service";
 import type { RankedAssetDto } from "../src/lib/types";
 import { THEME_CACHE_ID } from "../src/lib/theme-cache-constants";
-import { syncInterestAssetScoresToSupabase } from "../src/lib/interest-assets-supabase-sync";
 
 async function sleep(ms: number): Promise<void> {
   await new Promise((r) => setTimeout(r, ms));
@@ -258,16 +257,6 @@ async function main() {
   } catch (e) {
     console.error(
       "[refresh-feed-cache] themes section failed, skip upsert",
-      e,
-    );
-  }
-
-  console.log("[refresh-feed-cache] interest assets (OpenAI / deployed API → Supabase)…");
-  try {
-    await syncInterestAssetScoresToSupabase(supabase);
-  } catch (e) {
-    console.error(
-      "[refresh-feed-cache] interest assets sync failed, skip",
       e,
     );
   }

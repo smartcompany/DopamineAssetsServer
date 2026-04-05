@@ -1,0 +1,42 @@
+# 한국 장 마감 후 일일 작업 (10:00 KST = 01:00 UTC)
+# - 시장 요약 푸시: POST /api/cron/market-daily-push
+# - 관심 자산 TOP50 OpenAI → Supabase: POST /api/cron/interest-assets-daily
+name: Daily events (10:00 KST)
+
+on:
+  schedule:
+    - cron: "0 1 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  daily:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Market summary push
+        env:
+          CRON_API_BASE_URL: ${{ secrets.CRON_API_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_API_BASE_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "Missing CRON_API_BASE_URL or CRON_SECRET"
+            exit 1
+          fi
+          curl -sS -X POST "${CRON_API_BASE_URL}/api/cron/market-daily-push" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            --fail
+
+      - name: Interest assets → Supabase (OpenAI)
+        env:
+          CRON_API_BASE_URL: ${{ secrets.CRON_API_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_API_BASE_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "Missing CRON_API_BASE_URL or CRON_SECRET"
+            exit 1
+          fi
+          curl -sS -X POST "${CRON_API_BASE_URL}/api/cron/interest-assets-daily" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            --fail
