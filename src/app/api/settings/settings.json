@@ -11,12 +11,14 @@
     "ios": {
       "rewarded_test": "ca-app-pub-3940256099942544/1712485313",
       "rewarded_ad": "ca-app-pub-5520596727761259/9531931774",
-      "initial_ad": "ca-app-pub-5520596727761259/2035547726"
+      "initial_ad": "ca-app-pub-5520596727761259/2035547726",
+      "banner_ad": "ca-app-pub-5520596727761259/7697872288"
     },
     "android": {
       "rewarded_test": "ca-app-pub-3940256099942544/5224354917",
       "rewarded_ad": "ca-app-pub-5520596727761259/1789173121",
-      "initial_ad": "ca-app-pub-5520596727761259/8957945655"
+      "initial_ad": "ca-app-pub-5520596727761259/8957945655",
+      "banner_ad": "ca-app-pub-5520596727761259/6845721972"
     }
   }
 }
