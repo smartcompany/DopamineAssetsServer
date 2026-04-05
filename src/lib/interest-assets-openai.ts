@@ -7,16 +7,9 @@ const openai = new OpenAI({
 
 const EXPECTED_COUNT = 50;
 
-const ALLOWED_CATEGORIES = new Set([
-  "stock_us",
-  "stock_kr",
-  "commodity",
-  "crypto",
-]);
-
 export type InterestAssetCategory =
-  | "stock_us"
-  | "stock_kr"
+  | "us_stock"
+  | "kr_stock"
   | "commodity"
   | "crypto";
 
@@ -45,8 +38,15 @@ function extractJsonObject(raw: string): string {
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+const ALLOWED_INTEREST_CATEGORIES = new Set<string>([
+  "us_stock",
+  "kr_stock",
+  "commodity",
+  "crypto",
+]);
+
 function isInterestAssetCategory(s: string): s is InterestAssetCategory {
-  return ALLOWED_CATEGORIES.has(s);
+  return ALLOWED_INTEREST_CATEGORIES.has(s);
 }
 
 /**
@@ -76,7 +76,11 @@ export function parseInterestAssetsResponse(raw: string): InterestAssetsPayload 
     const r = row as Record<string, unknown>;
     const name = typeof r.name === "string" ? r.name.trim() : "";
     const symbol = typeof r.symbol === "string" ? r.symbol.trim() : "";
-    const cat = typeof r.category === "string" ? r.category.trim() : "";
+    const catRaw = typeof r.category === "string" ? r.category.trim() : "";
+    if (!isInterestAssetCategory(catRaw)) {
+      return null;
+    }
+    const cat = catRaw;
     const score =
       typeof r.score === "number" ? r.score : Number.parseFloat(String(r.score));
 
@@ -84,7 +88,6 @@ export function parseInterestAssetsResponse(raw: string): InterestAssetsPayload 
       name.length === 0 ||
       symbol.length > 64 ||
       symbol.length === 0 ||
-      !isInterestAssetCategory(cat) ||
       !Number.isFinite(score) ||
       score < 0 ||
       score > 100
@@ -132,8 +135,8 @@ function buildUserPrompt(utcDateLabel: string): string {
 반드시 다음 날짜 문자열을 사용하세요 (그대로 복사): "${utcDateLabel}"
 
 category 값은 반드시 다음 중 하나만 사용하세요 (영문 소문자):
-- stock_us (미국 주식)
-- stock_kr (한국 주식)
+- us_stock (미국 주식)
+- kr_stock (한국 주식)
 - commodity (원자재)
 - crypto (암호화폐)
 
@@ -153,7 +156,7 @@ category 값은 반드시 다음 중 하나만 사용하세요 (영문 소문자
       "rank": 2,
       "name": "테슬라",
       "symbol": "TSLA",
-      "category": "stock_us",
+      "category": "us_stock",
       "score": 95
     }
   ]
