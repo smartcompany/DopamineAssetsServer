@@ -7,6 +7,8 @@
     { "rewarded_test": 5 },
     { "rewarded_test": 1 }
   ],
+  "ios_banner_ad": "banner_ad",
+  "android_banner_ad": "banner_ad",
   "ref": {
     "ios": {
       "rewarded_test": "ca-app-pub-3940256099942544/1712485313",
