@@ -212,7 +212,7 @@ export async function getAssetDetail(params: {
     marketCap = yahoo?.marketCapFmt ?? null;
     marketCapRaw = yahoo?.marketCapRaw ?? null;
     marketCapRank = null;
-    currentPrice = null;
+    currentPrice = yahoo?.currentPriceFmt ?? null;
     sector = yahoo?.sector ?? null;
     industry = yahoo?.industry ?? null;
     exchange = yahoo?.exchange ?? null;

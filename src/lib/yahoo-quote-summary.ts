@@ -8,6 +8,8 @@ export type YahooQuoteSummaryDetail = {
   marketCapFmt: string | null;
   /** [currency]와 동일 단위의 시총 숫자 (예: KRW 원) */
   marketCapRaw: number | null;
+  /** `price.regularMarketPrice` 등 — 원자재 선물·주식 현재가 */
+  currentPriceFmt: string | null;
   exchange: string | null;
   currency: string | null;
   description: string | null;
@@ -36,6 +38,23 @@ function getYahooFinance(): InstanceType<typeof YahooFinance> {
 function pickText(v: unknown): string | null {
   if (typeof v === "string" && v.trim() !== "") return v.trim();
   return null;
+}
+
+function formatSpotPrice(n: number, currencyCode: string | null): string {
+  const code =
+    typeof currencyCode === "string" && /^[A-Za-z]{3}$/.test(currencyCode)
+      ? currencyCode.toUpperCase()
+      : "USD";
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: code,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 4,
+    }).format(n);
+  } catch {
+    return `${n} ${code}`;
+  }
 }
 
 function formatMarketCap(n: number, currencyCode: string): string {
@@ -76,6 +95,15 @@ function mapResult(symbol: string, r: QuoteSummaryResult): YahooQuoteSummaryDeta
   const marketCapFmt =
     marketCapRaw != null ? formatMarketCap(marketCapRaw, currency ?? "USD") : null;
 
+  const pickNum = (v: unknown): number | null =>
+    typeof v === "number" && Number.isFinite(v) && v > 0 ? v : null;
+  const spotRaw =
+    pickNum(pr?.regularMarketPrice) ??
+    pickNum(pr?.postMarketPrice) ??
+    pickNum(pr?.preMarketPrice);
+  const currentPriceFmt =
+    spotRaw != null ? formatSpotPrice(spotRaw, currency) : null;
+
   const displayName =
     pickText(pr?.longName) ??
     pickText(pr?.shortName) ??
@@ -88,6 +116,7 @@ function mapResult(symbol: string, r: QuoteSummaryResult): YahooQuoteSummaryDeta
     industry,
     marketCapFmt,
     marketCapRaw,
+    currentPriceFmt,
     exchange: pickText(pr?.exchangeName) ?? pickText(pr?.exchange),
     currency,
     description,
