@@ -1,4 +1,7 @@
-import { resolveYahooSymbol } from "@/lib/asset-detail-service";
+import {
+  normalizeCryptoRankingSymbolForDetail,
+  resolveYahooSymbol,
+} from "@/lib/asset-detail-service";
 import { fetchCoinGeckoOhlcBarsForCryptoRankingSymbol } from "@/lib/coingecko-chart";
 import { jsonWithCors } from "@/lib/cors";
 import type { AssetClass } from "@/lib/types";
@@ -21,17 +24,22 @@ function rangeDays(raw: string | null): number {
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const symbol = url.searchParams.get("symbol")?.trim();
+  const rawSymbol = url.searchParams.get("symbol")?.trim() ?? "";
   const assetClass = url.searchParams.get("assetClass")?.trim() as AssetClass | undefined;
   const range = url.searchParams.get("range")?.trim() ?? "3mo";
   const assetName = url.searchParams.get("assetName")?.trim() ?? "";
 
-  if (!symbol || symbol.length === 0) {
+  if (!rawSymbol || rawSymbol.length === 0) {
     return jsonWithCors({ error: "missing_symbol" }, { status: 400 });
   }
   if (!assetClass || !CLASSES.has(assetClass)) {
     return jsonWithCors({ error: "invalid_asset_class" }, { status: 400 });
   }
+
+  const symbol =
+    assetClass === "crypto"
+      ? normalizeCryptoRankingSymbolForDetail(rawSymbol)
+      : rawSymbol;
 
   const yahooSym = resolveYahooSymbol(assetClass, symbol);
   if (!yahooSym) {

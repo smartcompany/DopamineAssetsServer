@@ -36,6 +36,26 @@ export function parseCryptoPairFromRankingSymbol(symbol: string): {
 }
 
 /**
+ * 상세/코인 조회용: `BTC`, `BTC-USD` 등 → `BTCUSDT` (이미 USDT/USDC면 유지).
+ */
+export function normalizeCryptoRankingSymbolForDetail(symbol: string): string {
+  const t = symbol.trim();
+  if (t.length === 0) return t;
+  const u = t.toUpperCase();
+  if (u.endsWith("USDT") || u.endsWith("USDC")) {
+    return u;
+  }
+  const dash = u.match(/^([A-Z0-9]{1,20})-USD$/);
+  if (dash) {
+    return `${dash[1]}USDT`;
+  }
+  if (/^[A-Z0-9]{1,20}$/.test(u)) {
+    return `${u}USDT`;
+  }
+  return t;
+}
+
+/**
  * Yahoo Finance 심볼 (랭킹 심볼 → 차트/요약용).
  */
 export function resolveYahooSymbol(
@@ -67,7 +87,12 @@ export async function getAssetDetail(params: {
   /** `ko` — kr_stock 표시명을 네이버 한글 우선. 그 외 — Yahoo(영문) 우선 (랭킹 `locale`과 동일) */
   locale?: string;
 }): Promise<AssetDetailDto> {
-  const { symbol, assetClass, name, commodityKind, locale = "en" } = params;
+  const { assetClass, name, commodityKind, locale = "en" } = params;
+  const incoming = params.symbol.trim();
+  const symbol =
+    assetClass === "crypto"
+      ? normalizeCryptoRankingSymbolForDetail(incoming)
+      : incoming;
   const preferKoName = locale.trim().toLowerCase().startsWith("ko");
   const dataSources: string[] = [];
   const asOf = new Date().toISOString();
