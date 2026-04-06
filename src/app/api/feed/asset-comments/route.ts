@@ -13,6 +13,44 @@ const CLASSES = new Set(["us_stock", "kr_stock", "crypto", "commodity", "theme"]
 
 type AssetClass = "us_stock" | "kr_stock" | "crypto" | "commodity" | "theme";
 
+/**
+ * GET 쿼리 심볼과 DB `asset_symbol`이 달라도 같은 코인으로 묶기 (예: BTC vs BTC-USD vs BTCUSDT).
+ */
+function cryptoAssetSymbolQueryVariants(raw: string): string[] {
+  const t = raw.trim();
+  const out = new Set<string>();
+  if (t.length > 0) {
+    out.add(t);
+  }
+  const u = t.toUpperCase();
+  if (u.length > 0) {
+    out.add(u);
+  }
+
+  const pair = u.match(/^([A-Z0-9]{1,20})(USDT|USDC)$/);
+  if (pair) {
+    const base = pair[1];
+    out.add(base);
+    out.add(`${base}-USD`);
+  }
+
+  const dash = u.match(/^([A-Z0-9]{1,20})-USD$/);
+  if (dash) {
+    const base = dash[1];
+    out.add(base);
+    out.add(`${base}USDT`);
+    out.add(`${base}USDC`);
+  }
+
+  if (/^[A-Z0-9]{1,20}$/.test(u)) {
+    out.add(`${u}-USD`);
+    out.add(`${u}USDT`);
+    out.add(`${u}USDC`);
+  }
+
+  return [...out].filter((s) => s.length > 0);
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const symbol = url.searchParams.get("symbol")?.trim();
@@ -28,13 +66,21 @@ export async function GET(request: Request) {
   try {
     const supabase = getSupabaseAdmin();
     const viewerUid = await parseBearerUid(request);
-    const { data, error } = await supabase
+    const symbolFilter =
+      assetClass === "crypto"
+        ? cryptoAssetSymbolQueryVariants(symbol)
+        : [symbol];
+    let q = supabase
       .from("dopamine_asset_comments")
       .select(
         "id, parent_id, body, title, image_urls, author_uid, author_display_name, asset_display_name, created_at",
       )
-      .eq("asset_symbol", symbol)
-      .eq("asset_class", assetClass)
+      .eq("asset_class", assetClass);
+    q =
+      symbolFilter.length === 1
+        ? q.eq("asset_symbol", symbolFilter[0])
+        : q.in("asset_symbol", symbolFilter);
+    const { data, error } = await q
       .is("moderation_hidden_at", null)
       .order("created_at", { ascending: true });
 
