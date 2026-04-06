@@ -130,6 +130,7 @@ function buildUserPrompt(utcDateLabel: string): string {
 - 최근 검색량이 높거나 뉴스 언급이 많은 자산을 우선 포함할 것
 - 모든 자산에 대해 일관된 기준으로 점수를 부여할 것
 - 임의로 만든 가짜 자산은 포함하지 말 것
+- 원자재(commodity) symbol은 Yahoo Finance 티커를 쓸 것 (예: 금 GC=F, 은 SI=F, 원유 CL=F). FX 스팟 코드(XAUUSD 등)는 쓰지 말 것
 
 [출력의 date 필드]
 반드시 다음 날짜 문자열을 사용하세요 (그대로 복사): "${utcDateLabel}"
@@ -148,7 +149,7 @@ category 값은 반드시 다음 중 하나만 사용하세요 (영문 소문자
     {
       "rank": 1,
       "name": "금",
-      "symbol": "XAUUSD",
+      "symbol": "GC=F",
       "category": "commodity",
       "score": 100
     },
