@@ -1,3 +1,4 @@
+import { commoditySpotAliasToYahoo } from "./commodity-fx-yahoo";
 import { fetchCryptoProfileFromCoinGecko } from "./coingecko-asset-detail";
 import { fetchMoveSummaryKo } from "./asset-move-summary-batch";
 import { THEME_DEFINITIONS } from "./theme-definitions";
@@ -41,6 +42,9 @@ export function parseCryptoPairFromRankingSymbol(symbol: string): {
 export function normalizeCryptoRankingSymbolForDetail(symbol: string): string {
   const t = symbol.trim();
   if (t.length === 0) return t;
+  if (commoditySpotAliasToYahoo(t)) {
+    return t;
+  }
   const u = t.toUpperCase();
   if (u.endsWith("USDT") || u.endsWith("USDC")) {
     return u;
@@ -66,8 +70,11 @@ export function resolveYahooSymbol(
   switch (assetClass) {
     case "us_stock":
     case "kr_stock":
-    case "commodity":
       return s;
+    case "commodity": {
+      const fx = commoditySpotAliasToYahoo(s);
+      return fx?.yahoo ?? s;
+    }
     case "crypto": {
       const y = cryptoSymbolToYahooUsd(s);
       return y;
@@ -87,12 +94,25 @@ export async function getAssetDetail(params: {
   /** `ko` — kr_stock 표시명을 네이버 한글 우선. 그 외 — Yahoo(영문) 우선 (랭킹 `locale`과 동일) */
   locale?: string;
 }): Promise<AssetDetailDto> {
-  const { assetClass, name, commodityKind, locale = "en" } = params;
+  let assetClass = params.assetClass;
+  let commodityKind = params.commodityKind;
+  const { name, locale = "en" } = params;
   const incoming = params.symbol.trim();
-  const symbol =
-    assetClass === "crypto"
-      ? normalizeCryptoRankingSymbolForDetail(incoming)
-      : incoming;
+
+  const fxSpot = commoditySpotAliasToYahoo(incoming);
+  let symbol: string;
+  if (fxSpot && (assetClass === "crypto" || assetClass === "commodity")) {
+    symbol = fxSpot.yahoo;
+    commodityKind = commodityKind ?? fxSpot.commodityKind;
+    if (assetClass === "crypto") {
+      assetClass = "commodity";
+    }
+  } else if (assetClass === "crypto") {
+    symbol = normalizeCryptoRankingSymbolForDetail(incoming);
+  } else {
+    symbol = incoming;
+  }
+
   const preferKoName = locale.trim().toLowerCase().startsWith("ko");
   const dataSources: string[] = [];
   const asOf = new Date().toISOString();

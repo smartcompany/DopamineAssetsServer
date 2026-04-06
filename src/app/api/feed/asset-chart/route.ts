@@ -1,3 +1,4 @@
+import { commoditySpotAliasToYahoo } from "@/lib/commodity-fx-yahoo";
 import {
   normalizeCryptoRankingSymbolForDetail,
   resolveYahooSymbol,
@@ -36,12 +37,21 @@ export async function GET(request: Request) {
     return jsonWithCors({ error: "invalid_asset_class" }, { status: 400 });
   }
 
-  const symbol =
-    assetClass === "crypto"
-      ? normalizeCryptoRankingSymbolForDetail(rawSymbol)
-      : rawSymbol;
+  const fxSpot = commoditySpotAliasToYahoo(rawSymbol);
+  let assetClassEff = assetClass;
+  let symbol: string;
+  if (fxSpot && (assetClass === "crypto" || assetClass === "commodity")) {
+    symbol = fxSpot.yahoo;
+    if (assetClass === "crypto") {
+      assetClassEff = "commodity";
+    }
+  } else if (assetClass === "crypto") {
+    symbol = normalizeCryptoRankingSymbolForDetail(rawSymbol);
+  } else {
+    symbol = rawSymbol;
+  }
 
-  const yahooSym = resolveYahooSymbol(assetClass, symbol);
+  const yahooSym = resolveYahooSymbol(assetClassEff, symbol);
   if (!yahooSym) {
     return jsonWithCors({ error: "unsupported_symbol" }, { status: 400 });
   }
@@ -51,7 +61,7 @@ export async function GET(request: Request) {
     let bars: OhlcBar[];
     let chartSource: "yahoo" | "coingecko";
 
-    if (assetClass === "crypto") {
+    if (assetClassEff === "crypto") {
       const cg = await fetchCoinGeckoOhlcBarsForCryptoRankingSymbol({
         rankingSymbol: symbol,
         displayName: assetName.length > 0 ? assetName : null,
@@ -74,7 +84,7 @@ export async function GET(request: Request) {
 
     return jsonWithCors({
       symbol,
-      assetClass,
+      assetClass: assetClassEff,
       yahooSymbol: yahooSym,
       chartSource,
       interval: "1d",
