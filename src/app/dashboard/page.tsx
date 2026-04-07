@@ -112,6 +112,7 @@ export default function DashboardPage() {
   const [hmdSaveLoading, setHmdSaveLoading] = useState(false);
   /** 푸시 문구 편집 탭: 한국어 / English */
   const [hmdPushLocale, setHmdPushLocale] = useState<"ko" | "en">("ko");
+  const [activeTab, setActiveTab] = useState<"reports" | "push">("reports");
 
   const fetchTargetDetail = async (
     commentId: string,
@@ -491,7 +492,33 @@ export default function DashboardPage() {
       </header>
 
       <main className="p-4 max-w-7xl mx-auto">
-        <section className="mb-6 rounded-xl border border-amber-200 bg-amber-50/90 p-4 shadow-sm">
+        <div className="mb-4 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab("reports")}
+            className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
+              activeTab === "reports"
+                ? "bg-zinc-800 text-white"
+                : "bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-50"
+            }`}
+          >
+            {isKo ? "신고 관리" : "Report moderation"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("push")}
+            className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
+              activeTab === "push"
+                ? "bg-amber-800 text-white"
+                : "bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-50"
+            }`}
+          >
+            {isKo ? "급등·급락 토론 푸시" : "Hot-mover discussion push"}
+          </button>
+        </div>
+
+        {activeTab === "push" && (
+          <section className="mb-6 rounded-xl border border-amber-200 bg-amber-50/90 p-4 shadow-sm">
           <h2 className="text-base font-semibold text-amber-950 mb-1">
             급등·급락 토론 푸시 (4시간 크론)
           </h2>
@@ -737,14 +764,17 @@ export default function DashboardPage() {
           {!hmdConfig && !hmdLoadError && (
             <p className="text-sm text-zinc-500">설정 불러오는 중…</p>
           )}
-        </section>
+          </section>
+        )}
 
-        <p className="text-sm text-zinc-600 mb-3">
+        {activeTab === "reports" && (
+          <>
+            <p className="text-sm text-zinc-600 mb-3">
           AI가 <strong>hide_post</strong>로 판정하면 해당 글에 숨김 플래그가
           붙어 앱 사용자에게는 보이지 않습니다(삭제 아님). 오판이면 아래
           관리자 처리에서 <strong>글 노출·신고 기각</strong>으로 번복하세요.
-        </p>
-        <div className="flex flex-wrap items-center gap-4 mb-4">
+            </p>
+            <div className="flex flex-wrap items-center gap-4 mb-4">
           <span className="text-sm text-zinc-600">24시간 기준:</span>
           <select
             value={filter24h}
@@ -757,8 +787,8 @@ export default function DashboardPage() {
             <option value="over24">24시간 경과</option>
             <option value="within24">검토 기한 내</option>
           </select>
-        </div>
-        <div className="rounded-xl border border-zinc-200 bg-white overflow-hidden">
+            </div>
+            <div className="rounded-xl border border-zinc-200 bg-white overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
@@ -829,7 +859,7 @@ export default function DashboardPage() {
                           {r.target_title_or_content || "-"}
                         </button>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 text-zinc-900">
                         <div className="flex flex-col gap-1">
                           <span>{r.host_or_author_name ?? r.host_or_author_id ?? "-"}</span>
                           {r.target_user_suspended_until &&
@@ -846,7 +876,7 @@ export default function DashboardPage() {
                           {r.reason ?? "-"}
                         </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 text-zinc-900">
                         {r.reporter_name ?? r.reporter_user_id}
                       </td>
                       <td className="px-4 py-3">
@@ -927,8 +957,8 @@ export default function DashboardPage() {
               </tbody>
             </table>
           </div>
-        </div>
-        <div className="mt-4 flex justify-end">
+            </div>
+            <div className="mt-4 flex justify-end">
           <button
             type="button"
             onClick={handleUpdateStatus}
@@ -937,7 +967,9 @@ export default function DashboardPage() {
           >
             {updateLoading ? "처리 중…" : "상태 업데이트"}
           </button>
-        </div>
+            </div>
+          </>
+        )}
 
         {(detail !== null || detailLoading || detailFallback !== null) && (
           <div
