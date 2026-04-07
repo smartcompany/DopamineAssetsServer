@@ -879,12 +879,12 @@ export default function DashboardPage() {
                       <td className="px-4 py-3 text-zinc-900">
                         {r.reporter_name ?? r.reporter_user_id}
                       </td>
-                      <td className="px-4 py-3">
-                        <span className="font-medium">
+                      <td className="px-4 py-3 text-zinc-900">
+                        <span className="font-medium text-zinc-900">
                           {getVerdictLabel(r.ai_verdict)}
                         </span>
                         {r.ai_reason && (
-                          <div className="text-zinc-500 text-xs mt-0.5 whitespace-pre-wrap break-words max-w-[280px]">
+                          <div className="text-zinc-700 text-xs mt-0.5 whitespace-pre-wrap break-words max-w-[280px]">
                             {r.ai_reason}
                           </div>
                         )}
