@@ -49,6 +49,18 @@ function isInterestAssetCategory(s: string): s is InterestAssetCategory {
   return ALLOWED_INTEREST_CATEGORIES.has(s);
 }
 
+function normalizeInterestAssetSymbol(
+  symbol: string,
+  category: InterestAssetCategory,
+): string {
+  const s = symbol.trim().toUpperCase();
+  if (category === "crypto") {
+    const dashUsd = s.match(/^([A-Z0-9]{1,20})-USD$/);
+    if (dashUsd) return dashUsd[1];
+  }
+  return symbol.trim();
+}
+
 /**
  * 모델 출력 JSON을 검증·정규화. 실패 시 null.
  */
@@ -75,7 +87,7 @@ export function parseInterestAssetsResponse(raw: string): InterestAssetsPayload 
     if (typeof row !== "object" || row === null) return null;
     const r = row as Record<string, unknown>;
     const name = typeof r.name === "string" ? r.name.trim() : "";
-    const symbol = typeof r.symbol === "string" ? r.symbol.trim() : "";
+    const symbolRaw = typeof r.symbol === "string" ? r.symbol.trim() : "";
     const catRaw = typeof r.category === "string" ? r.category.trim() : "";
     if (!isInterestAssetCategory(catRaw)) {
       return null;
@@ -86,14 +98,15 @@ export function parseInterestAssetsResponse(raw: string): InterestAssetsPayload 
 
     if (
       name.length === 0 ||
-      symbol.length > 64 ||
-      symbol.length === 0 ||
+      symbolRaw.length > 64 ||
+      symbolRaw.length === 0 ||
       !Number.isFinite(score) ||
       score < 0 ||
       score > 100
     ) {
       return null;
     }
+    const symbol = normalizeInterestAssetSymbol(symbolRaw, cat);
     rows.push({
       name,
       symbol,
@@ -130,7 +143,9 @@ function buildUserPrompt(utcDateLabel: string): string {
 - 최근 검색량이 높거나 뉴스 언급이 많은 자산을 우선 포함할 것
 - 모든 자산에 대해 일관된 기준으로 점수를 부여할 것
 - 임의로 만든 가짜 자산은 포함하지 말 것
+- name은 기본적으로 영어(영문) 자산명을 사용할 것 (예: Bitcoin, Tesla, Samsung Electronics)
 - 원자재(commodity) symbol은 반드시 Yahoo Finance 선물 티커만 쓸 것 (금 GC=F, 은 SI=F, 원유 CL=F, 백금 PL=F, 팔라듐 PA=F). FX 스팟·브로커 코드(XAUUSD, XAGUSD 등)는 절대 쓰지 말 것. 금·은을 crypto 카테고리로 넣지 말 것.
+- crypto symbol은 반드시 코인 베이스 심볼만 쓸 것 (예: BTC, ETH, SOL). BTC-USD 같은 -USD 접미사는 절대 쓰지 말 것.
 
 [출력의 date 필드]
 반드시 다음 날짜 문자열을 사용하세요 (그대로 복사): "${utcDateLabel}"
@@ -148,14 +163,14 @@ category 값은 반드시 다음 중 하나만 사용하세요 (영문 소문자
   "assets": [
     {
       "rank": 1,
-      "name": "금",
+      "name": "Gold Futures",
       "symbol": "GC=F",
       "category": "commodity",
       "score": 100
     },
     {
       "rank": 2,
-      "name": "테슬라",
+      "name": "Tesla",
       "symbol": "TSLA",
       "category": "us_stock",
       "score": 95
