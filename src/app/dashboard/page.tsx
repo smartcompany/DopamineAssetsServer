@@ -2,6 +2,14 @@
 
 import { useEffect, useState } from "react";
 
+/** 관리자 처리 드롭다운 값 (DB admin_verdict와 동일) */
+type AdminVerdictSelection =
+  | ""
+  | "no_issue"
+  | "content_hidden";
+
+type UserActionSelection = "none" | "suspend" | "unsuspend";
+
 type ReportRow = {
   id: string;
   target_type: "asset_comment";
@@ -87,11 +95,11 @@ export default function DashboardPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailFallback, setDetailFallback] = useState<string | null>(null);
   const [adminSelections, setAdminSelections] = useState<
-    Record<string, "content_hidden" | "no_issue" | "">
+    Record<string, AdminVerdictSelection>
   >({});
-  const [userActions, setUserActions] = useState<
-    Record<string, "none" | "suspend_7d" | "unsuspend">
-  >({});
+  const [userActions, setUserActions] = useState<Record<string, UserActionSelection>>(
+    {},
+  );
   const [updateLoading, setUpdateLoading] = useState(false);
   const [filter24h, setFilter24h] = useState<"all" | "over24" | "within24">(
     "all",
@@ -155,7 +163,7 @@ export default function DashboardPage() {
   };
 
   const fetchReports = async (
-    priorSelections?: Record<string, "content_hidden" | "no_issue" | "">,
+    priorSelections?: Record<string, AdminVerdictSelection>,
   ) => {
     const res = await fetch(`${API}/api/dashboard/reports`, {
       credentials: "include",
@@ -173,14 +181,11 @@ export default function DashboardPage() {
     const data = (await res.json()) as { reports?: ReportRow[] };
     setReports(data.reports || []);
     setAuthenticated(true);
-    const initial: Record<string, "content_hidden" | "no_issue" | ""> = {};
-    const initialUserActions: Record<
-      string,
-      "none" | "suspend_7d" | "unsuspend"
-    > = {};
+    const initial: Record<string, AdminVerdictSelection> = {};
+    const initialUserActions: Record<string, UserActionSelection> = {};
     for (const r of data.reports || []) {
       const raw = r.admin_verdict ?? priorSelections?.[r.id];
-      const v =
+      const v: AdminVerdictSelection =
         raw === "remove_post"
           ? "content_hidden"
           : raw === "content_hidden" || raw === "no_issue"
@@ -325,20 +330,26 @@ export default function DashboardPage() {
   };
 
   const handleUpdateStatus = async () => {
+    const actionable: AdminVerdictSelection[] = ["no_issue", "content_hidden"];
     const updates = reports
       .filter(
         (r) =>
-          adminSelections[r.id] === "content_hidden" ||
-          adminSelections[r.id] === "no_issue",
+          actionable.includes(adminSelections[r.id]) ||
+          (userActions[r.id] ?? "none") !== "none",
       )
-      .map((r) => ({
-        report_id: r.id,
-        admin_verdict: adminSelections[r.id] as "content_hidden" | "no_issue",
-        user_action: (userActions[r.id] ?? "none") as
-          | "none"
-          | "suspend_7d"
-          | "unsuspend",
-      }));
+      .map((r) => {
+        const selectedAdmin = adminSelections[r.id] ?? "";
+        return {
+          report_id: r.id,
+          ...(selectedAdmin
+            ? {
+                admin_verdict:
+                  selectedAdmin as Exclude<AdminVerdictSelection, "">,
+              }
+            : {}),
+          user_action: (userActions[r.id] ?? "none") as UserActionSelection,
+        };
+      });
     if (updates.length === 0) {
       alert(isKo ? "선택한 신고 처리가 없습니다." : "No report actions selected.");
       return;
@@ -870,10 +881,7 @@ export default function DashboardPage() {
                           onChange={(e) =>
                             setAdminSelections((prev) => ({
                               ...prev,
-                              [r.id]: e.target.value as
-                                | "content_hidden"
-                                | "no_issue"
-                                | "",
+                              [r.id]: e.target.value as AdminVerdictSelection,
                             }))
                           }
                           className="rounded border border-zinc-300 px-2 py-1.5 text-zinc-800 text-sm focus:border-zinc-500 focus:outline-none"
@@ -897,10 +905,7 @@ export default function DashboardPage() {
                           onChange={(e) =>
                             setUserActions((prev) => ({
                               ...prev,
-                              [r.id]: e.target.value as
-                                | "none"
-                                | "suspend_7d"
-                                | "unsuspend",
+                              [r.id]: e.target.value as UserActionSelection,
                             }))
                           }
                           className="rounded border border-zinc-300 px-2 py-1.5 text-zinc-800 text-sm focus:border-zinc-500 focus:outline-none"
@@ -908,8 +913,8 @@ export default function DashboardPage() {
                           <option value="none">
                             {isKo ? "변경 없음" : "No change"}
                           </option>
-                          <option value="suspend_7d">
-                            {isKo ? "계정 사용정지 7일" : "Suspend account (7 days)"}
+                          <option value="suspend">
+                            {isKo ? "계정 사용정지" : "Suspend account"}
                           </option>
                           <option value="unsuspend">
                             {isKo ? "사용정지 해제" : "Unsuspend account"}
