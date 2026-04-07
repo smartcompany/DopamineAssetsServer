@@ -17,6 +17,7 @@ type ReportRow = {
   ai_verdict_at: string | null;
   created_at: string;
   admin_verdict: string | null;
+  target_user_suspended_until: string | null;
 };
 
 const API = process.env.NEXT_PUBLIC_API_BASE || "";
@@ -73,6 +74,8 @@ function isOver24h(createdAt: string | null): boolean {
 }
 
 export default function DashboardPage() {
+  const [locale, setLocale] = useState<"ko" | "en">("ko");
+  const isKo = locale === "ko";
   const [reports, setReports] = useState<ReportRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
@@ -85,6 +88,9 @@ export default function DashboardPage() {
   const [detailFallback, setDetailFallback] = useState<string | null>(null);
   const [adminSelections, setAdminSelections] = useState<
     Record<string, "content_hidden" | "no_issue" | "">
+  >({});
+  const [userActions, setUserActions] = useState<
+    Record<string, "none" | "suspend_7d" | "unsuspend">
   >({});
   const [updateLoading, setUpdateLoading] = useState(false);
   const [filter24h, setFilter24h] = useState<"all" | "over24" | "within24">(
@@ -115,7 +121,9 @@ export default function DashboardPage() {
         setDetail(null);
         setDetailFallback(
           listPreview ||
-            "원문을 불러올 수 없습니다. (이미 삭제되었을 수 있습니다.)",
+            isKo
+              ? "원문을 불러올 수 없습니다. (이미 삭제되었을 수 있습니다.)"
+              : "Failed to load original content. It may have been deleted.",
         );
         return;
       }
@@ -136,7 +144,9 @@ export default function DashboardPage() {
       setDetail(null);
       setDetailFallback(
         r.target_title_or_content ||
-          "저장된 미리보기만 있습니다. 글이 삭제된 경우 원문을 열 수 없습니다.",
+          isKo
+            ? "저장된 미리보기만 있습니다. 글이 삭제된 경우 원문을 열 수 없습니다."
+            : "Only snapshot preview is available. Original may have been deleted.",
       );
       setDetailLoading(false);
       return;
@@ -164,6 +174,10 @@ export default function DashboardPage() {
     setReports(data.reports || []);
     setAuthenticated(true);
     const initial: Record<string, "content_hidden" | "no_issue" | ""> = {};
+    const initialUserActions: Record<
+      string,
+      "none" | "suspend_7d" | "unsuspend"
+    > = {};
     for (const r of data.reports || []) {
       const raw = r.admin_verdict ?? priorSelections?.[r.id];
       const v =
@@ -173,8 +187,10 @@ export default function DashboardPage() {
             ? raw
             : "";
       initial[r.id] = v;
+      initialUserActions[r.id] = "none";
     }
     setAdminSelections(initial);
+    setUserActions(initialUserActions);
   };
 
   useEffect(() => {
@@ -318,9 +334,13 @@ export default function DashboardPage() {
       .map((r) => ({
         report_id: r.id,
         admin_verdict: adminSelections[r.id] as "content_hidden" | "no_issue",
+        user_action: (userActions[r.id] ?? "none") as
+          | "none"
+          | "suspend_7d"
+          | "unsuspend",
       }));
     if (updates.length === 0) {
-      alert("선택한 신고 처리가 없습니다.");
+      alert(isKo ? "선택한 신고 처리가 없습니다." : "No report actions selected.");
       return;
     }
     setUpdateLoading(true);
@@ -333,7 +353,10 @@ export default function DashboardPage() {
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
-        alert(data.error || "상태 업데이트에 실패했습니다.");
+        alert(
+          data.error ||
+            (isKo ? "상태 업데이트에 실패했습니다." : "Failed to update status."),
+        );
         return;
       }
       await fetchReports(adminSelections);
@@ -359,7 +382,7 @@ export default function DashboardPage() {
   if (loading && authenticated === null) {
     return (
       <div className="min-h-screen bg-zinc-100 flex items-center justify-center">
-        <p className="text-zinc-500">확인 중...</p>
+        <p className="text-zinc-500">{isKo ? "확인 중..." : "Checking..."}</p>
       </div>
     );
   }
@@ -369,12 +392,23 @@ export default function DashboardPage() {
       <div className="min-h-screen bg-zinc-100 flex items-center justify-center p-4">
         <div className="w-full max-w-sm rounded-xl bg-white shadow-lg border border-zinc-200 p-8">
           <h1 className="text-xl font-semibold text-zinc-800 mb-6 text-center">
-            관리자 로그인
+            {isKo ? "관리자 로그인" : "Admin Login"}
           </h1>
+          <div className="mb-4 flex items-center justify-end gap-2 text-xs">
+            <span className="text-zinc-500">{isKo ? "언어" : "Language"}</span>
+            <select
+              value={locale}
+              onChange={(e) => setLocale(e.target.value as "ko" | "en")}
+              className="rounded border border-zinc-300 px-2 py-1 text-sm text-zinc-800 bg-white focus:border-zinc-500 focus:outline-none"
+            >
+              <option value="ko">한국어</option>
+              <option value="en">English</option>
+            </select>
+          </div>
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-zinc-600 mb-1">
-                아이디
+                {isKo ? "아이디" : "Username"}
               </label>
               <input
                 type="text"
@@ -387,7 +421,7 @@ export default function DashboardPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-zinc-600 mb-1">
-                비밀번호
+                {isKo ? "비밀번호" : "Password"}
               </label>
               <input
                 type="password"
@@ -406,7 +440,13 @@ export default function DashboardPage() {
               disabled={loginLoading}
               className="w-full rounded-lg bg-zinc-800 text-white py-2 font-medium hover:bg-zinc-700 disabled:opacity-50"
             >
-              {loginLoading ? "로그인 중..." : "로그인"}
+              {loginLoading
+                ? isKo
+                  ? "로그인 중..."
+                  : "Signing in..."
+                : isKo
+                  ? "로그인"
+                  : "Sign in"}
             </button>
           </form>
         </div>
@@ -417,14 +457,26 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-zinc-100">
       <header className="bg-white border-b border-zinc-200 px-4 py-3 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-zinc-800">관리 대시보드</h1>
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="text-sm text-zinc-600 hover:text-zinc-900"
-        >
-          로그아웃
-        </button>
+        <h1 className="text-lg font-semibold text-zinc-800">
+          {isKo ? "관리 대시보드" : "Moderation Dashboard"}
+        </h1>
+        <div className="flex items-center gap-3">
+          <select
+            value={locale}
+            onChange={(e) => setLocale(e.target.value as "ko" | "en")}
+            className="rounded border border-zinc-300 px-2 py-1 text-sm text-zinc-800 bg-white focus:border-zinc-500 focus:outline-none"
+          >
+            <option value="ko">한국어</option>
+            <option value="en">English</option>
+          </select>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="text-sm text-zinc-600 hover:text-zinc-900"
+          >
+            {isKo ? "로그아웃" : "Logout"}
+          </button>
+        </div>
       </header>
 
       <main className="p-4 max-w-7xl mx-auto">
@@ -700,34 +752,45 @@ export default function DashboardPage() {
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-zinc-200 bg-zinc-50 text-zinc-600 font-medium">
-                  <th className="px-4 py-3">유형</th>
-                  <th className="px-4 py-3">글 미리보기</th>
-                  <th className="px-4 py-3">작성자</th>
-                  <th className="px-4 py-3">신고 내용</th>
-                  <th className="px-4 py-3">신고자</th>
-                  <th className="px-4 py-3">AI 처리</th>
-                  <th className="px-4 py-3">신고 일시</th>
-                  <th className="px-4 py-3">24시간</th>
-                  <th className="px-4 py-3">관리자 처리</th>
+                  <th className="px-4 py-3">{isKo ? "유형" : "Type"}</th>
+                  <th className="px-4 py-3">
+                    {isKo ? "글 미리보기" : "Post preview"}
+                  </th>
+                  <th className="px-4 py-3">{isKo ? "작성자" : "Author"}</th>
+                  <th className="px-4 py-3">
+                    {isKo ? "신고 내용" : "Report reason"}
+                  </th>
+                  <th className="px-4 py-3">{isKo ? "신고자" : "Reporter"}</th>
+                  <th className="px-4 py-3">{isKo ? "AI 처리" : "AI verdict"}</th>
+                  <th className="px-4 py-3">{isKo ? "신고 일시" : "Reported at"}</th>
+                  <th className="px-4 py-3">24h</th>
+                  <th className="px-4 py-3">
+                    {isKo ? "관리자 처리" : "Admin verdict"}
+                  </th>
+                  <th className="px-4 py-3">
+                    {isKo ? "계정 조치" : "Account action"}
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {reports.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={9}
+                      colSpan={10}
                       className="px-4 py-8 text-center text-zinc-500"
                     >
-                      신고 내역이 없습니다.
+                      {isKo ? "신고 내역이 없습니다." : "No reports."}
                     </td>
                   </tr>
                 ) : sortedReports.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={9}
+                      colSpan={10}
                       className="px-4 py-8 text-center text-zinc-500"
                     >
-                      해당 조건에 맞는 신고가 없습니다.
+                      {isKo
+                        ? "해당 조건에 맞는 신고가 없습니다."
+                        : "No reports match this filter."}
                     </td>
                   </tr>
                 ) : (
@@ -738,7 +801,7 @@ export default function DashboardPage() {
                     >
                       <td className="px-4 py-3">
                         <span className="text-emerald-700 font-medium">
-                          커뮤니티
+                          {isKo ? "커뮤니티" : "Community"}
                         </span>
                       </td>
                       <td className="px-4 py-3 max-w-[200px]">
@@ -746,13 +809,26 @@ export default function DashboardPage() {
                           type="button"
                           onClick={() => openDetail(r)}
                           className="text-left w-full truncate block text-zinc-800 underline decoration-zinc-300 hover:decoration-zinc-600 focus:outline-none"
-                          title="클릭하면 원문·사진 보기"
+                          title={
+                            isKo
+                              ? "클릭하면 원문·사진 보기"
+                              : "Open original content and images"
+                          }
                         >
                           {r.target_title_or_content || "-"}
                         </button>
                       </td>
                       <td className="px-4 py-3">
-                        {r.host_or_author_name ?? r.host_or_author_id ?? "-"}
+                        <div className="flex flex-col gap-1">
+                          <span>{r.host_or_author_name ?? r.host_or_author_id ?? "-"}</span>
+                          {r.target_user_suspended_until &&
+                            new Date(r.target_user_suspended_until).getTime() >
+                              Date.now() && (
+                              <span className="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium bg-red-100 text-red-800">
+                                {isKo ? "사용정지 중" : "Suspended"}
+                              </span>
+                            )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 max-w-[220px]">
                         <div className="font-medium text-zinc-800">
@@ -780,11 +856,11 @@ export default function DashboardPage() {
                       <td className="px-4 py-3">
                         {isOver24h(r.created_at) ? (
                           <span className="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium bg-red-100 text-red-800">
-                            24시간 경과
+                            {isKo ? "24시간 경과" : "Over 24h"}
                           </span>
                         ) : (
                           <span className="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800">
-                            검토 기한 내
+                            {isKo ? "검토 기한 내" : "Within 24h"}
                           </span>
                         )}
                       </td>
@@ -802,12 +878,41 @@ export default function DashboardPage() {
                           }
                           className="rounded border border-zinc-300 px-2 py-1.5 text-zinc-800 text-sm focus:border-zinc-500 focus:outline-none"
                         >
-                          <option value="">선택 안 함</option>
+                          <option value="">{isKo ? "선택 안 함" : "No change"}</option>
                           <option value="no_issue">
-                            글 노출·신고 기각 (숨김 해제)
+                            {isKo
+                              ? "글 노출·신고 기각 (숨김 해제)"
+                              : "No issue (unhide post)"}
                           </option>
                           <option value="content_hidden">
-                            글 숨김·차단 (확정)
+                            {isKo
+                              ? "글 숨김·차단 (확정)"
+                              : "Hide post (confirmed)"}
+                          </option>
+                        </select>
+                      </td>
+                      <td className="px-4 py-3">
+                        <select
+                          value={userActions[r.id] ?? "none"}
+                          onChange={(e) =>
+                            setUserActions((prev) => ({
+                              ...prev,
+                              [r.id]: e.target.value as
+                                | "none"
+                                | "suspend_7d"
+                                | "unsuspend",
+                            }))
+                          }
+                          className="rounded border border-zinc-300 px-2 py-1.5 text-zinc-800 text-sm focus:border-zinc-500 focus:outline-none"
+                        >
+                          <option value="none">
+                            {isKo ? "변경 없음" : "No change"}
+                          </option>
+                          <option value="suspend_7d">
+                            {isKo ? "계정 사용정지 7일" : "Suspend account (7 days)"}
+                          </option>
+                          <option value="unsuspend">
+                            {isKo ? "사용정지 해제" : "Unsuspend account"}
                           </option>
                         </select>
                       </td>

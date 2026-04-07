@@ -17,6 +17,7 @@ type DashboardReportRow = {
   ai_verdict_at: string | null;
   created_at: string;
   admin_verdict: string | null;
+  target_user_suspended_until: string | null;
 };
 
 function previewContent(
@@ -103,10 +104,11 @@ export async function GET(request: Request) {
     }
 
     const usersMap = new Map<string, string | null>();
+    const suspendedUntilByUid = new Map<string, string | null>();
     if (userIds.size > 0) {
       const { data: profs, error: pErr } = await supabase
         .from("dopamine_user_profiles")
-        .select("uid, display_name")
+      .select("uid, display_name, suspended_until")
         .in("uid", [...userIds]);
       if (pErr) {
         console.error("[dashboard reports] profiles", pErr);
@@ -115,6 +117,8 @@ export async function GET(request: Request) {
           const uid = p.uid as string;
           const dn = (p.display_name as string | null)?.trim();
           usersMap.set(uid, dn && dn.length > 0 ? dn : null);
+          const su = (p.suspended_until as string | null)?.trim() ?? null;
+          suspendedUntilByUid.set(uid, su && su.length > 0 ? su : null);
         }
       }
     }
@@ -144,6 +148,9 @@ export async function GET(request: Request) {
         ai_verdict_at: (r.ai_verdict_at as string | null) ?? null,
         created_at: r.created_at as string,
         admin_verdict: (r.admin_verdict as string | null) ?? null,
+        target_user_suspended_until:
+          (authorUid ? (suspendedUntilByUid.get(authorUid) ?? null) : null) ??
+          null,
       };
     });
 

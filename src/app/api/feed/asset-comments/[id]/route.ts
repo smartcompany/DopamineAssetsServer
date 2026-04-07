@@ -7,6 +7,7 @@ import {
   fetchLikedCommentIdsForUser,
 } from "@/lib/comment-like-counts";
 import { checkBannedWords } from "@/lib/validate-banned-words";
+import { getUserSuspensionState } from "@/lib/user-suspension";
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
@@ -172,6 +173,16 @@ export async function PATCH(request: Request, ctx: RouteCtx) {
 
   const auth = await requireAuthor(request, id);
   if (!auth.ok) return auth.response;
+  const suspension = await getUserSuspensionState(auth.uid);
+  if (suspension.suspended) {
+    return jsonWithCors(
+      {
+        error: "user_suspended",
+        suspended_until: suspension.suspendedUntil,
+      },
+      { status: 403 },
+    );
+  }
 
   let body: unknown;
   try {

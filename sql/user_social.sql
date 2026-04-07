@@ -6,9 +6,12 @@ create table if not exists public.dopamine_user_profiles (
   display_name text,
   photo_url text,
   auth_email text,
+  suspended_until timestamptz,
   updated_at timestamptz not null default now()
 );
 alter table public.dopamine_user_profiles enable row level security;
+alter table public.dopamine_user_profiles
+  add column if not exists suspended_until timestamptz;
 
 create table if not exists public.dopamine_user_follows (
   follower_uid text not null,

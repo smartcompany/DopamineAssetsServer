@@ -8,6 +8,7 @@ import {
 } from "@/lib/comment-like-counts";
 import { checkBannedWords } from "@/lib/validate-banned-words";
 import { notifyCommentReply } from "@/lib/push-notifications";
+import { getUserSuspensionState } from "@/lib/user-suspension";
 
 const CLASSES = new Set(["us_stock", "kr_stock", "crypto", "commodity", "theme"]);
 
@@ -264,6 +265,16 @@ export async function POST(request: Request) {
 
   try {
     const supabase = getSupabaseAdmin();
+    const suspension = await getUserSuspensionState(uid);
+    if (suspension.suspended) {
+      return jsonWithCors(
+        {
+          error: "user_suspended",
+          suspended_until: suspension.suspendedUntil,
+        },
+        { status: 403 },
+      );
+    }
 
     const { data: profRow } = await supabase
       .from("dopamine_user_profiles")

@@ -6,6 +6,8 @@ type UpdateItem = {
   report_id: string;
   /** 글 차단(숨김) 확정 — moderation_hidden_at 설정 */
   admin_verdict: "content_hidden" | "no_issue";
+  /** 작성자 계정 사용정지 처리 */
+  user_action?: "none" | "suspend_7d" | "unsuspend";
 };
 
 /**
@@ -34,12 +36,17 @@ export async function POST(request: Request) {
   }
 
   const valid = ["content_hidden", "no_issue"] as const;
+  const validUserAction = ["none", "suspend_7d", "unsuspend"] as const;
   for (const u of updates) {
-    if (!u.report_id || !valid.includes(u.admin_verdict)) {
+    if (
+      !u.report_id ||
+      !valid.includes(u.admin_verdict) ||
+      (u.user_action != null && !validUserAction.includes(u.user_action))
+    ) {
       return NextResponse.json(
         {
           error:
-            "Each update must have report_id and admin_verdict (content_hidden | no_issue)",
+            "Each update must have report_id, admin_verdict and optional user_action (none | suspend_7d | unsuspend)",
         },
         { status: 400 },
       );
@@ -53,7 +60,7 @@ export async function POST(request: Request) {
     for (const u of updates) {
       const { data: report, error: fetchErr } = await supabase
         .from("dopamine_comment_reports")
-        .select("id, comment_id")
+        .select("id, comment_id, target_author_uid")
         .eq("id", u.report_id)
         .maybeSingle();
 
@@ -85,6 +92,46 @@ export async function POST(request: Request) {
           .eq("id", commentId);
         if (upErr) {
           console.error("[dashboard update-status] unhide comment", upErr);
+        }
+      }
+
+      const targetAuthorUid = (report.target_author_uid as string | null) ?? null;
+      const userAction = u.user_action ?? "none";
+      if (targetAuthorUid && userAction !== "none") {
+        if (userAction === "suspend_7d") {
+          const until = new Date(
+            Date.now() + 7 * 24 * 60 * 60 * 1000,
+          ).toISOString();
+          const { error: suspendErr } = await supabase
+            .from("dopamine_user_profiles")
+            .upsert(
+              {
+                uid: targetAuthorUid,
+                suspended_until: until,
+                updated_at: now,
+              },
+              { onConflict: "uid" },
+            );
+          if (suspendErr) {
+            console.error("[dashboard update-status] suspend user", suspendErr);
+          }
+        } else if (userAction === "unsuspend") {
+          const { error: unsuspendErr } = await supabase
+            .from("dopamine_user_profiles")
+            .upsert(
+              {
+                uid: targetAuthorUid,
+                suspended_until: null,
+                updated_at: now,
+              },
+              { onConflict: "uid" },
+            );
+          if (unsuspendErr) {
+            console.error(
+              "[dashboard update-status] unsuspend user",
+              unsuspendErr,
+            );
+          }
         }
       }
     }
