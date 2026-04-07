@@ -75,8 +75,16 @@ export async function POST(request: Request) {
       }
 
       const commentId = report.comment_id as string | null;
-      const targetAuthorUid =
+      let targetAuthorUid =
         (report.target_author_uid as string | null) ?? null;
+      if (!targetAuthorUid && commentId) {
+        const { data: cRow } = await supabase
+          .from("dopamine_asset_comments")
+          .select("author_uid")
+          .eq("id", commentId)
+          .maybeSingle();
+        targetAuthorUid = (cRow?.author_uid as string | null) ?? null;
+      }
 
       if (commentId && u.admin_verdict) {
         if (u.admin_verdict === "content_hidden") {

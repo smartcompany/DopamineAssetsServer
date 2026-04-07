@@ -107,7 +107,7 @@ export async function GET(request: Request) {
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase
       .from("dopamine_user_profiles")
-      .select("uid, display_name, photo_url")
+      .select("uid, display_name, photo_url, suspended_until")
       .eq("uid", uid)
       .maybeSingle();
     if (error) {
@@ -123,11 +123,14 @@ export async function GET(request: Request) {
     const rowUid = typeof data.uid === "string" && data.uid.length > 0 ? data.uid : uid;
     const displayName = ((data.display_name as string | null) ?? "").trim();
     const photoUrl = (data.photo_url as string | null)?.trim() || null;
+    const suspendedUntilRaw =
+      (data.suspended_until as string | null | undefined) ?? null;
     return jsonWithCors({
       profile: {
         uid: rowUid,
         displayName,
         photoUrl,
+        suspendedUntil: suspendedUntilRaw,
       },
     });
   } catch (e) {
