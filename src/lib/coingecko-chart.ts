@@ -8,6 +8,16 @@ import type { OhlcBar } from "./yahoo-chart";
 const COINGECKO_BASE = "https://api.coingecko.com/api/v3";
 const UA =
   "DopamineAssets/1.0 (asset-chart; +https://github.com/DopamineAssets)";
+const HOT_CACHE_TTL_MS = 60_000;
+const STALE_FALLBACK_TTL_MS = 30 * 60_000;
+
+type CacheEntry = {
+  bars: OhlcBar[];
+  tsMs: number;
+};
+
+const responseCache = new Map<string, CacheEntry>();
+const inFlight = new Map<string, Promise<OhlcBar[] | null>>();
 
 function coingeckoOhlcDays(range: string): number {
   switch (range) {
@@ -28,6 +38,18 @@ export async function fetchCoinGeckoOhlcBarsForCryptoRankingSymbol(params: {
   range: string;
 }): Promise<OhlcBar[] | null> {
   const { rankingSymbol, displayName, range } = params;
+  const cacheKey = `${rankingSymbol.toUpperCase()}|${range}`;
+  const now = Date.now();
+  const cached = responseCache.get(cacheKey);
+  if (cached && now - cached.tsMs <= HOT_CACHE_TTL_MS) {
+    return cached.bars;
+  }
+  const pending = inFlight.get(cacheKey);
+  if (pending) {
+    return pending;
+  }
+
+  const task = (async (): Promise<OhlcBar[] | null> => {
   const pair = parseCryptoPairFromRankingSymbol(rankingSymbol);
   if (!pair) return null;
 
@@ -48,11 +70,35 @@ export async function fetchCoinGeckoOhlcBarsForCryptoRankingSymbol(params: {
   const days = coingeckoOhlcDays(range);
   const ohlcBars = await fetchCoinGeckoOhlcRaw(profile.coinId, days);
   if (ohlcBars && ohlcBars.length > 0) {
+    responseCache.set(cacheKey, { bars: ohlcBars, tsMs: Date.now() });
     return ohlcBars;
   }
 
   console.warn("[coingecko-chart] OHLC empty, trying market_chart", profile.coinId);
-  return await fetchCoinGeckoMarketChartDailyBars(profile.coinId, days);
+  const marketBars = await fetchCoinGeckoMarketChartDailyBars(profile.coinId, days);
+  if (marketBars && marketBars.length > 0) {
+    responseCache.set(cacheKey, { bars: marketBars, tsMs: Date.now() });
+    return marketBars;
+  }
+
+  const stale = responseCache.get(cacheKey);
+  if (stale && Date.now() - stale.tsMs <= STALE_FALLBACK_TTL_MS) {
+    console.warn("[coingecko-chart] using stale cached bars after upstream miss", {
+      rankingSymbol,
+      range,
+      ageMs: Date.now() - stale.tsMs,
+    });
+    return stale.bars;
+  }
+  return null;
+  })();
+
+  inFlight.set(cacheKey, task);
+  try {
+    return await task;
+  } finally {
+    inFlight.delete(cacheKey);
+  }
 }
 
 async function fetchCoinGeckoOhlcRaw(
