@@ -1,6 +1,6 @@
 import { jsonWithCors } from "@/lib/cors";
 import { parseBearerUid } from "@/lib/auth-bearer";
-import { getCommunityPosts } from "@/lib/community-posts-service";
+import { getCommunityPostsPaged } from "@/lib/community-posts-service";
 
 function isSort(v: string | null): v is "latest" | "popular" {
   return v === "latest" || v === "popular";
@@ -26,10 +26,12 @@ export async function GET(request: Request) {
   const assetClass = url.searchParams.get("assetClass")?.trim();
   const authorUid = url.searchParams.get("authorUid")?.trim();
   const bodyTerms = parseBodyTerms(url);
+  const page = Math.max(0, Number.parseInt(url.searchParams.get("page") ?? "0", 10) || 0);
+  const limit = Math.max(1, Number.parseInt(url.searchParams.get("limit") ?? "20", 10) || 20);
 
   try {
     const viewerUid = await parseBearerUid(request);
-    const items = await getCommunityPosts(
+    const result = await getCommunityPostsPaged(
       sort,
       {
         assetSymbol: symbol && assetClass ? symbol : undefined,
@@ -38,8 +40,9 @@ export async function GET(request: Request) {
         bodyTerms: bodyTerms.length > 0 ? bodyTerms : undefined,
       },
       viewerUid,
+      { page, limit },
     );
-    return jsonWithCors({ sort, items });
+    return jsonWithCors({ sort, page: result.page, limit: result.limit, hasMore: result.hasMore, items: result.items });
   } catch (e) {
     console.error(e);
     const msg = e instanceof Error ? e.message : "unknown";

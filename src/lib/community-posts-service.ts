@@ -30,6 +30,7 @@ type Sort = "latest" | "popular";
 const ROOT_LIMIT_LATEST = 60;
 const ROOT_LIMIT_POPULAR_POOL = 200;
 const RESPONSE_LIMIT = 50;
+const MAX_RESPONSE_LIMIT = 100;
 
 export type CommunityPostsFilter = {
   /** Both required to filter by one listing */
@@ -39,6 +40,13 @@ export type CommunityPostsFilter = {
   authorUid?: string;
   /** 본문에 이 중 하나라도 포함(대소문자 무시). 심볼 필터와 동시에 쓰이면 OR 로 합칩니다. */
   bodyTerms?: string[];
+};
+
+export type CommunityPostsPage = {
+  items: CommunityPostRow[];
+  page: number;
+  limit: number;
+  hasMore: boolean;
 };
 
 const ROOT_SELECT =
@@ -181,7 +189,23 @@ export async function getCommunityPosts(
   filter: CommunityPostsFilter = {},
   viewerUid?: string | null,
 ): Promise<CommunityPostRow[]> {
+  const paged = await getCommunityPostsPaged(sort, filter, viewerUid, {
+    page: 0,
+    limit: RESPONSE_LIMIT,
+  });
+  return paged.items;
+}
+
+export async function getCommunityPostsPaged(
+  sort: Sort,
+  filter: CommunityPostsFilter = {},
+  viewerUid?: string | null,
+  pagination?: { page?: number; limit?: number },
+): Promise<CommunityPostsPage> {
   const supabase = getSupabaseAdmin();
+  const page = Math.max(0, pagination?.page ?? 0);
+  const limit = Math.min(MAX_RESPONSE_LIMIT, Math.max(1, pagination?.limit ?? RESPONSE_LIMIT));
+  const offset = page * limit;
 
   const symbol = filter.assetSymbol?.trim();
   const assetClass = filter.assetClass?.trim();
@@ -196,8 +220,8 @@ export async function getCommunityPosts(
   /** 심볼로 좁힌 글 ∪ 본문 검색어에 맞는 글 (둘 중 하나만 만족해도 포함) */
   const unionSymbolOrBody = hasSymbolFilter && hasBodyTerms;
 
-  const poolLimit =
-    sort === "latest" ? ROOT_LIMIT_LATEST : ROOT_LIMIT_POPULAR_POOL;
+  const basePoolLimit = sort === "latest" ? ROOT_LIMIT_LATEST : ROOT_LIMIT_POPULAR_POOL;
+  const poolLimit = Math.max(basePoolLimit, offset + limit + 20);
 
   let roots: RootRow[] = [];
   /** 심볼+본문 동시일 때는 이미 OR 로 합쳤으므로 끝에서 본문 필터를 다시 적용하지 않음 */
@@ -280,7 +304,7 @@ export async function getCommunityPosts(
     }
 
     if (!rootsRaw?.length) {
-      return [];
+      return { items: [], page, limit, hasMore: false };
     }
 
     roots = rootsRaw.map((r: Record<string, unknown>) =>
@@ -295,7 +319,7 @@ export async function getCommunityPosts(
   }
 
   if (!roots.length) {
-    return [];
+    return { items: [], page, limit, hasMore: false };
   }
 
   const authorUids = [...new Set(roots.map((r) => r.author_uid))];
@@ -369,7 +393,13 @@ export async function getCommunityPosts(
   }
 
   if (sort === "latest") {
-    return enriched.slice(0, RESPONSE_LIMIT);
+    const hasMore = enriched.length > offset + limit;
+    return {
+      items: enriched.slice(offset, offset + limit),
+      page,
+      limit,
+      hasMore,
+    };
   }
 
   enriched.sort((a, b) => {
@@ -378,5 +408,11 @@ export async function getCommunityPosts(
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 
-  return enriched.slice(0, RESPONSE_LIMIT);
+  const hasMore = enriched.length > offset + limit;
+  return {
+    items: enriched.slice(offset, offset + limit),
+    page,
+    limit,
+    hasMore,
+  };
 }
