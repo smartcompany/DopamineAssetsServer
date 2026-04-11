@@ -2,7 +2,6 @@
  * 크립토 일봉: CoinGecko `/coins/{id}/ohlc`, 비면 `market_chart` 일별 종가 합성.
  */
 import { fetchCryptoProfileFromCoinGecko } from "./coingecko-asset-detail";
-import { parseCryptoPairFromRankingSymbol } from "./asset-detail-service";
 import type { OhlcBar } from "./yahoo-chart";
 
 const COINGECKO_BASE = "https://api.coingecko.com/api/v3";
@@ -59,12 +58,9 @@ export async function fetchCoinGeckoOhlcBarsForCryptoRankingSymbol(params: {
   let coinId: string | null = idKey.length > 0 ? idKey : null;
 
   if (!coinId) {
-    const pair = parseCryptoPairFromRankingSymbol(rankingSymbol);
-    if (!pair) return null;
-
     const profile = await fetchCryptoProfileFromCoinGecko({
       rankingSymbol,
-      baseSymbolUpper: pair.base,
+      baseSymbolUpper: rankingSymbol,
       displayName: displayName?.trim() ?? "",
     });
     coinId = profile?.coinId ?? null;

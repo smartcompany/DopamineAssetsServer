@@ -6,36 +6,6 @@ import { fetchKrStockNameFromNaver } from "./kr-stock";
 import type { AssetClass, AssetDetailDto, CommodityKind } from "./types";
 import { fetchYahooQuoteSummary } from "./yahoo-quote-summary";
 
-function cryptoSymbolToYahooUsd(symbol: string): string | null {
-  const t = symbol.trim();
-  if (/^[A-Za-z0-9]+-USD$/i.test(t)) {
-    return t.toUpperCase();
-  }
-  const u = t.toUpperCase();
-  if (u.endsWith("USDT")) {
-    const base = u.slice(0, -4);
-    if (base.length === 0) return null;
-    return `${base}-USD`;
-  }
-  if (u.endsWith("USDC")) {
-    const base = u.slice(0, -4);
-    if (base.length === 0) return null;
-    return `${base}-USD`;
-  }
-  return null;
-}
-
-/** Bybit 대체: `BTCUSDT` 등에서 베이스/쿼트 추정 (Vercel에서 Bybit 403 회피). */
-export function parseCryptoPairFromRankingSymbol(symbol: string): {
-  base: string;
-  quote: string;
-} | null {
-  const u = symbol.toUpperCase().trim();
-  const m = u.match(/^([A-Z0-9]{1,20})(USDT|USDC)$/);
-  if (!m) return null;
-  return { base: m[1], quote: m[2] };
-}
-
 /**
  * Yahoo Finance 심볼 (랭킹 심볼 → 차트/요약용).
  */
@@ -47,14 +17,11 @@ export function resolveYahooSymbol(
   switch (assetClass) {
     case "us_stock":
     case "kr_stock":
+    case "crypto":
       return s;
     case "commodity": {
       const fx = commoditySpotAliasToYahoo(s);
       return fx?.yahoo ?? s;
-    }
-    case "crypto": {
-      const y = cryptoSymbolToYahooUsd(s);
-      return y;
     }
     case "theme":
       return null;
@@ -116,12 +83,8 @@ export async function getAssetDetail(params: {
   let baseCurrency: string | null = null;
   let quoteCurrency: string | null = null;
   if (assetClass === "crypto") {
-    const pair = parseCryptoPairFromRankingSymbol(symbol);
-    if (pair) {
-      baseCurrency = pair.base;
-      quoteCurrency = pair.quote;
-      dataSources.push("symbol_parse_crypto_pair");
-    }
+    baseCurrency = symbol;
+    quoteCurrency = null;
   }
 
   let displayName: string;
@@ -145,32 +108,29 @@ export async function getAssetDetail(params: {
     currency = null;
     description = null;
     website = null;
-    const pair = parseCryptoPairFromRankingSymbol(symbol);
     let cgProfile: Awaited<ReturnType<typeof fetchCryptoProfileFromCoinGecko>> = null;
-    if (pair) {
-      try {
-        const label = name.trim() || symbol;
-        cgProfile = await fetchCryptoProfileFromCoinGecko({
-          rankingSymbol: symbol,
-          baseSymbolUpper: pair.base,
-          displayName: label,
-        });
-        if (cgProfile) {
-          dataSources.push(`coingecko_coin:${cgProfile.coinId}`);
-          marketCap = cgProfile.marketCapFmt;
-          marketCapRaw = null;
-          marketCapRank = cgProfile.marketCapRank;
-          currentPrice = cgProfile.currentPriceFmt;
-          sector = cgProfile.sector;
-          industry = cgProfile.industry;
-          exchange = cgProfile.exchange;
-          currency = cgProfile.currency;
-          description = cgProfile.description;
-          website = cgProfile.website;
-        }
-      } catch (e) {
-        console.error("[asset-detail] CoinGecko failed", symbol, e);
+    try {
+      const label = name.trim() || symbol;
+      cgProfile = await fetchCryptoProfileFromCoinGecko({
+        rankingSymbol: symbol,
+        baseSymbolUpper: symbol,
+        displayName: label,
+      });
+      if (cgProfile) {
+        dataSources.push(`coingecko_coin:${cgProfile.coinId}`);
+        marketCap = cgProfile.marketCapFmt;
+        marketCapRaw = null;
+        marketCapRank = cgProfile.marketCapRank;
+        currentPrice = cgProfile.currentPriceFmt;
+        sector = cgProfile.sector;
+        industry = cgProfile.industry;
+        exchange = cgProfile.exchange;
+        currency = cgProfile.currency;
+        description = cgProfile.description;
+        website = cgProfile.website;
       }
+    } catch (e) {
+      console.error("[asset-detail] CoinGecko failed", symbol, e);
     }
     displayName = name.trim() || cgProfile?.name || symbol;
   } else {
