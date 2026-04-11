@@ -37,29 +37,6 @@ export function parseCryptoPairFromRankingSymbol(symbol: string): {
 }
 
 /**
- * 상세/코인 조회용: `BTC`, `BTC-USD` 등 → `BTCUSDT` (이미 USDT/USDC면 유지).
- */
-export function normalizeCryptoRankingSymbolForDetail(symbol: string): string {
-  const t = symbol.trim();
-  if (t.length === 0) return t;
-  if (commoditySpotAliasToYahoo(t)) {
-    return t;
-  }
-  const u = t.toUpperCase();
-  if (u.endsWith("USDT") || u.endsWith("USDC")) {
-    return u;
-  }
-  const dash = u.match(/^([A-Z0-9]{1,20})-USD$/);
-  if (dash) {
-    return `${dash[1]}USDT`;
-  }
-  if (/^[A-Z0-9]{1,20}$/.test(u)) {
-    return `${u}USDT`;
-  }
-  return t;
-}
-
-/**
  * Yahoo Finance 심볼 (랭킹 심볼 → 차트/요약용).
  */
 export function resolveYahooSymbol(
@@ -108,7 +85,7 @@ export async function getAssetDetail(params: {
       assetClass = "commodity";
     }
   } else if (assetClass === "crypto") {
-    symbol = normalizeCryptoRankingSymbolForDetail(incoming);
+    symbol = incoming;
   } else {
     symbol = incoming;
   }

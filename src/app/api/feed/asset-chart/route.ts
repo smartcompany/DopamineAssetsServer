@@ -1,8 +1,5 @@
 import { commoditySpotAliasToYahoo } from "@/lib/commodity-fx-yahoo";
-import {
-  normalizeCryptoRankingSymbolForDetail,
-  resolveYahooSymbol,
-} from "@/lib/asset-detail-service";
+import { resolveYahooSymbol } from "@/lib/asset-detail-service";
 import { fetchCoinGeckoOhlcBarsForCryptoRankingSymbol } from "@/lib/coingecko-chart";
 import { jsonWithCors } from "@/lib/cors";
 import type { AssetClass } from "@/lib/types";
@@ -47,7 +44,7 @@ export async function GET(request: Request) {
       assetClassEff = "commodity";
     }
   } else if (assetClass === "crypto") {
-    symbol = normalizeCryptoRankingSymbolForDetail(rawSymbol);
+    symbol = rawSymbol;
   } else {
     symbol = rawSymbol;
   }
