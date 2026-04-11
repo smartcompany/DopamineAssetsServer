@@ -25,6 +25,8 @@ export type CommodityKind =
 
 export type RankedAssetDto = {
   symbol: string;
+  /** CoinGecko `/coins/markets` 의 코인 `id` — `dopamine_feed_cache` 크립토 행에만 사용 */
+  id?: string;
   /** kr_stock: `refresh-feed-cache`가 Yahoo quoteSummary 표기(영문·라틴)로 맞춤. 한글 UI는 `nameKo`→`name` 치환 */
   name: string;
   /** 네이버 종목 메인 제목 — `refresh-feed-cache`가 채움. `locale=ko` 랭킹 응답에서 `name`으로 승격 */

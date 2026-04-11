@@ -47,6 +47,7 @@ function isStableLike(symbolLower: string): boolean {
 }
 
 type CoinGeckoMarketRow = {
+  id?: string;
   symbol?: string;
   name?: string;
   total_volume?: number | null;
@@ -102,8 +103,7 @@ async function fetchMarketsPageWithRetry(
 }
 
 /**
- * CoinGecko `/coins/markets` 여러 페이지(거래량순) → USDT 심볼 형태 `RankedAssetDto[]`.
- * 사전 코인 목록 없이 상위 유동성 코인에서 등락률을 채운다.
+ * CoinGecko `/coins/markets` (page=1) → `symbol`·`id` 는 API 값 그대로, `dopamine_feed_cache`에 저장.
  */
 export async function fetchCoinGeckoMarketRowsForCache(
   options?: {
@@ -130,8 +130,9 @@ export async function fetchCoinGeckoMarketRowsForCache(
   const out: RankedAssetDto[] = [];
 
   for (const t of all) {
-    const sym = t.symbol?.trim().toLowerCase();
-    if (!sym || isStableLike(sym)) continue;
+    const rawSymbol =
+      typeof t.symbol === "string" ? t.symbol.trim() : "";
+    if (!rawSymbol || isStableLike(rawSymbol.toLowerCase())) continue;
 
     const vol = t.total_volume ?? 0;
     if (!Number.isFinite(vol) || vol < minVolumeUsd) continue;
@@ -142,11 +143,16 @@ export async function fetchCoinGeckoMarketRowsForCache(
     const priceChangePct = raw;
     const volumeChangePct = 0;
     const score = dopamineScore(priceChangePct, volumeChangePct);
-    const upper = sym.toUpperCase();
+    const cgId = typeof t.id === "string" ? t.id.trim() : "";
+    const displayName =
+      typeof t.name === "string" && t.name.trim() !== ""
+        ? t.name.trim()
+        : rawSymbol;
 
     out.push({
-      symbol: `${upper}USDT`,
-      name: typeof t.name === "string" && t.name.trim() !== "" ? t.name.trim() : upper,
+      symbol: rawSymbol,
+      ...(cgId.length > 0 ? { id: cgId } : {}),
+      name: displayName,
       assetClass: "crypto",
       priceChangePct: round2(priceChangePct),
       volumeChangePct: round2(volumeChangePct),
