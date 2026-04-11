@@ -1,11 +1,9 @@
 {
   "ios_ads": [
-    { "initial_ad": 5 },
-    { "rewarded_ad": 1 }
+    { "initial_ad": 5 }
   ],
   "android_ads": [
-    { "initial_ad": 5 },
-    { "rewarded_ad": 1 }
+    { "rewarded_test": 5 }
   ],
   "ios_banner_ad": "banner_ad",
   "android_banner_ad": "banner_ad",
