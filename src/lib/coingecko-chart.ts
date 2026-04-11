@@ -36,9 +36,15 @@ export async function fetchCoinGeckoOhlcBarsForCryptoRankingSymbol(params: {
   /** 자산명(상세 화면) — 검색 정확도 향상 */
   displayName: string | null;
   range: string;
+  /** `/coins/markets` 의 CoinGecko coin `id` — 있으면 검색·매칭 생략 */
+  coingeckoId?: string | null;
 }): Promise<OhlcBar[] | null> {
-  const { rankingSymbol, displayName, range } = params;
-  const cacheKey = `${rankingSymbol.toUpperCase()}|${range}`;
+  const { rankingSymbol, displayName, range, coingeckoId } = params;
+  const idKey = coingeckoId?.trim() ?? "";
+  const cacheKey =
+    idKey.length > 0
+      ? `cg:${idKey.toLowerCase()}|${range}`
+      : `${rankingSymbol.toUpperCase()}|${range}`;
   const now = Date.now();
   const cached = responseCache.get(cacheKey);
   if (cached && now - cached.tsMs <= HOT_CACHE_TTL_MS) {
@@ -50,32 +56,38 @@ export async function fetchCoinGeckoOhlcBarsForCryptoRankingSymbol(params: {
   }
 
   const task = (async (): Promise<OhlcBar[] | null> => {
-  const pair = parseCryptoPairFromRankingSymbol(rankingSymbol);
-  if (!pair) return null;
+  let coinId: string | null = idKey.length > 0 ? idKey : null;
 
-  const profile = await fetchCryptoProfileFromCoinGecko({
-    rankingSymbol,
-    baseSymbolUpper: pair.base,
-    displayName: displayName?.trim() ?? "",
-  });
-  if (!profile?.coinId) {
+  if (!coinId) {
+    const pair = parseCryptoPairFromRankingSymbol(rankingSymbol);
+    if (!pair) return null;
+
+    const profile = await fetchCryptoProfileFromCoinGecko({
+      rankingSymbol,
+      baseSymbolUpper: pair.base,
+      displayName: displayName?.trim() ?? "",
+    });
+    coinId = profile?.coinId ?? null;
+  }
+
+  if (!coinId) {
     console.warn("[coingecko-chart] no CoinGecko coinId", {
       rankingSymbol,
-      base: pair.base,
+      coingeckoId: idKey || null,
       displayName: displayName?.trim() ?? "",
     });
     return null;
   }
 
   const days = coingeckoOhlcDays(range);
-  const ohlcBars = await fetchCoinGeckoOhlcRaw(profile.coinId, days);
+  const ohlcBars = await fetchCoinGeckoOhlcRaw(coinId, days);
   if (ohlcBars && ohlcBars.length > 0) {
     responseCache.set(cacheKey, { bars: ohlcBars, tsMs: Date.now() });
     return ohlcBars;
   }
 
-  console.warn("[coingecko-chart] OHLC empty, trying market_chart", profile.coinId);
-  const marketBars = await fetchCoinGeckoMarketChartDailyBars(profile.coinId, days);
+  console.warn("[coingecko-chart] OHLC empty, trying market_chart", coinId);
+  const marketBars = await fetchCoinGeckoMarketChartDailyBars(coinId, days);
   if (marketBars && marketBars.length > 0) {
     responseCache.set(cacheKey, { bars: marketBars, tsMs: Date.now() });
     return marketBars;

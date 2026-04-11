@@ -29,6 +29,7 @@ export async function GET(request: Request) {
   const assetClass = url.searchParams.get("assetClass")?.trim() as AssetClass | undefined;
   const range = url.searchParams.get("range")?.trim() ?? "3mo";
   const assetName = url.searchParams.get("assetName")?.trim() ?? "";
+  const coingeckoId = url.searchParams.get("id")?.trim() ?? "";
 
   if (!rawSymbol || rawSymbol.length === 0) {
     return jsonWithCors({ error: "missing_symbol" }, { status: 400 });
@@ -52,7 +53,10 @@ export async function GET(request: Request) {
   }
 
   const yahooSym = resolveYahooSymbol(assetClassEff, symbol);
-  if (!yahooSym) {
+  if (
+    !yahooSym &&
+    !(assetClassEff === "crypto" && coingeckoId.length > 0)
+  ) {
     return jsonWithCors({ error: "unsupported_symbol" }, { status: 400 });
   }
 
@@ -66,9 +70,14 @@ export async function GET(request: Request) {
         rankingSymbol: symbol,
         displayName: assetName.length > 0 ? assetName : null,
         range: r,
+        coingeckoId: coingeckoId.length > 0 ? coingeckoId : null,
       });
       if (!cg || cg.length === 0) {
-        console.error("[asset-chart] CoinGecko returned no bars", { symbol, yahooSym });
+        console.error("[asset-chart] CoinGecko returned no bars", {
+          symbol,
+          yahooSym,
+          coingeckoId: coingeckoId || null,
+        });
         return jsonWithCors(
           { error: "upstream_failed", detail: "coingecko_no_bars" },
           { status: 502 },
@@ -77,6 +86,9 @@ export async function GET(request: Request) {
       bars = cg;
       chartSource = "coingecko";
     } else {
+      if (!yahooSym) {
+        return jsonWithCors({ error: "unsupported_symbol" }, { status: 400 });
+      }
       const days = rangeDays(r);
       bars = await fetchYahooOhlcBars(yahooSym, days);
       chartSource = "yahoo";
@@ -85,14 +97,14 @@ export async function GET(request: Request) {
     return jsonWithCors({
       symbol,
       assetClass: assetClassEff,
-      yahooSymbol: yahooSym,
+      yahooSymbol: yahooSym ?? "",
       chartSource,
       interval: "1d",
       range,
       bars,
     });
   } catch (e) {
-    console.error("[asset-chart]", yahooSym, e);
+    console.error("[asset-chart]", yahooSym ?? symbol, e);
     const msg = e instanceof Error ? e.message : "unknown";
     return jsonWithCors({ error: "upstream_failed", detail: msg }, { status: 502 });
   }
