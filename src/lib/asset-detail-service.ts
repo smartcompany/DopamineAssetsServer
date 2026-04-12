@@ -17,6 +17,8 @@ export function resolveYahooSymbol(
   switch (assetClass) {
     case "us_stock":
     case "kr_stock":
+    case "jp_stock":
+    case "cn_stock":
     case "crypto":
       return s;
     case "commodity": {

@@ -1,4 +1,11 @@
-export type AssetClass = "us_stock" | "kr_stock" | "crypto" | "commodity" | "theme";
+export type AssetClass =
+  | "us_stock"
+  | "kr_stock"
+  | "jp_stock"
+  | "cn_stock"
+  | "crypto"
+  | "commodity"
+  | "theme";
 
 export type CommodityKind =
   | "crude_oil"

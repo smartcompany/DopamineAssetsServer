@@ -128,6 +128,16 @@ export async function getFeedRankings(
       rows = [...rows, ...r];
       basisParts.push("supabase_kr_naver");
     }
+    if (classes.has("jp_stock")) {
+      const { rows: r } = await fetchFeedCacheRows(FEED_CACHE_ID.jp_stock);
+      rows = [...rows, ...r];
+      basisParts.push("supabase_jp_universe_yahoo");
+    }
+    if (classes.has("cn_stock")) {
+      const { rows: r } = await fetchFeedCacheRows(FEED_CACHE_ID.cn_stock);
+      rows = [...rows, ...r];
+      basisParts.push("supabase_cn_universe_yahoo");
+    }
     if (classes.has("commodity")) {
       const { rows: r } = await fetchFeedCacheRows(FEED_CACHE_ID.commodity);
       rows = [...rows, ...r];
@@ -148,6 +158,16 @@ export async function getFeedRankings(
       const { rows: r } = await fetchFeedCacheRows(FEED_CACHE_ID.kr_stock);
       rows = [...rows, ...r];
       basisParts.push("supabase_kr_naver");
+    }
+    if (classes.has("jp_stock")) {
+      const { rows: r } = await fetchFeedCacheRows(FEED_CACHE_ID.jp_stock);
+      rows = [...rows, ...r];
+      basisParts.push("supabase_jp_universe_yahoo");
+    }
+    if (classes.has("cn_stock")) {
+      const { rows: r } = await fetchFeedCacheRows(FEED_CACHE_ID.cn_stock);
+      rows = [...rows, ...r];
+      basisParts.push("supabase_cn_universe_yahoo");
     }
     if (classes.has("commodity")) {
       const { rows: r } = await fetchFeedCacheRows(FEED_CACHE_ID.commodity);

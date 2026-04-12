@@ -3,6 +3,8 @@ import type { AssetClass } from "./types";
 const VALID = new Set<AssetClass>([
   "us_stock",
   "kr_stock",
+  "jp_stock",
+  "cn_stock",
   "crypto",
   "commodity",
 ]);
@@ -14,6 +16,8 @@ export function resolveAssetClasses(
   const all: AssetClass[] = [
     "us_stock",
     "kr_stock",
+    "jp_stock",
+    "cn_stock",
     "crypto",
     "commodity",
   ];

@@ -10,9 +10,24 @@ import { checkBannedWords } from "@/lib/validate-banned-words";
 import { notifyCommentReply } from "@/lib/push-notifications";
 import { getUserSuspensionState } from "@/lib/user-suspension";
 
-const CLASSES = new Set(["us_stock", "kr_stock", "crypto", "commodity", "theme"]);
+const CLASSES = new Set([
+  "us_stock",
+  "kr_stock",
+  "jp_stock",
+  "cn_stock",
+  "crypto",
+  "commodity",
+  "theme",
+]);
 
-type AssetClass = "us_stock" | "kr_stock" | "crypto" | "commodity" | "theme";
+type AssetClass =
+  | "us_stock"
+  | "kr_stock"
+  | "jp_stock"
+  | "cn_stock"
+  | "crypto"
+  | "commodity"
+  | "theme";
 
 /**
  * GET 쿼리 심볼과 DB `asset_symbol`이 달라도 같은 코인으로 묶기 (예: BTC vs BTC-USD vs BTCUSDT).

@@ -13,7 +13,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchCoinGeckoMarketRowsForCache } from "../src/lib/coingecko-markets";
 import { FEED_CACHE_ID } from "../src/lib/feed-cache-constants";
 import { buildRankedRowFromYahooDaily } from "../src/lib/feed-rankings-row";
-import { FEED_UNIVERSE } from "../src/lib/feed-universe";
+import {
+  CN_STOCK_UNIVERSE,
+  FEED_UNIVERSE,
+  JP_STOCK_UNIVERSE,
+} from "../src/lib/feed-universe";
 import {
   enrichKrStockRowsDisplayNamesFromYahooAndNaver,
   fetchKrStockRowsFromNaver,
@@ -219,6 +223,46 @@ async function main() {
   } catch (e) {
     console.error(
       "[refresh-feed-cache] us_universe section failed, skip upsert",
+      e,
+    );
+  }
+
+  console.log("[refresh-feed-cache] jp_stock (Yahoo daily, .T universe)…");
+  try {
+    const jpRows: RankedAssetDto[] = [];
+    for (const entry of JP_STOCK_UNIVERSE) {
+      const row = await buildRankedRowFromYahooDaily(entry);
+      if (row) jpRows.push(row);
+      await sleep(75);
+    }
+    const jpStore = pickGainersLosersForStore(jpRows);
+    console.log(
+      `[refresh-feed-cache] jp_stock store pre=${jpRows.length} store=${jpStore.length}`,
+    );
+    await upsertRankedFeedIfHasData(supabase, FEED_CACHE_ID.jp_stock, jpStore);
+  } catch (e) {
+    console.error(
+      "[refresh-feed-cache] jp_stock section failed, skip upsert",
+      e,
+    );
+  }
+
+  console.log("[refresh-feed-cache] cn_stock (Yahoo daily, .SS/.SZ universe)…");
+  try {
+    const cnRows: RankedAssetDto[] = [];
+    for (const entry of CN_STOCK_UNIVERSE) {
+      const row = await buildRankedRowFromYahooDaily(entry);
+      if (row) cnRows.push(row);
+      await sleep(75);
+    }
+    const cnStore = pickGainersLosersForStore(cnRows);
+    console.log(
+      `[refresh-feed-cache] cn_stock store pre=${cnRows.length} store=${cnStore.length}`,
+    );
+    await upsertRankedFeedIfHasData(supabase, FEED_CACHE_ID.cn_stock, cnStore);
+  } catch (e) {
+    console.error(
+      "[refresh-feed-cache] cn_stock section failed, skip upsert",
       e,
     );
   }

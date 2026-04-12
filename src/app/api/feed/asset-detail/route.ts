@@ -4,7 +4,15 @@ import { resolveRankingsLocale } from "@/lib/feed-rankings-service";
 import { resolveThemeIdByDisplayName } from "@/lib/theme-definitions";
 import type { AssetClass, CommodityKind } from "@/lib/types";
 
-const CLASSES = new Set<AssetClass>(["us_stock", "kr_stock", "crypto", "commodity", "theme"]);
+const CLASSES = new Set<AssetClass>([
+  "us_stock",
+  "kr_stock",
+  "jp_stock",
+  "cn_stock",
+  "crypto",
+  "commodity",
+  "theme",
+]);
 
 export async function GET(request: Request) {
   const url = new URL(request.url);

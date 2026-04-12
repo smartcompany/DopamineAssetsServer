@@ -7,7 +7,7 @@ create table if not exists public.dopamine_user_favorite_assets (
   created_at timestamptz not null default now(),
   primary key (user_uid, asset_class, symbol),
   constraint dopamine_user_favorite_assets_class_check check (
-    asset_class in ('us_stock', 'kr_stock', 'crypto', 'commodity', 'theme')
+    asset_class in ('us_stock', 'kr_stock', 'jp_stock', 'cn_stock', 'crypto', 'commodity', 'theme')
   ),
   constraint dopamine_user_favorite_assets_symbol_len check (
     char_length(symbol) between 1 and 128

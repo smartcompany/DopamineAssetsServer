@@ -109,6 +109,8 @@ async function callOpenAiForBatch(
     const validClass =
       assetClass === "us_stock" ||
       assetClass === "kr_stock" ||
+      assetClass === "jp_stock" ||
+      assetClass === "cn_stock" ||
       assetClass === "crypto" ||
       assetClass === "commodity";
     if (symbol && validClass && summary.length > 0) {

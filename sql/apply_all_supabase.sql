@@ -26,7 +26,7 @@ create table if not exists public.dopamine_asset_comments (
     char_length(body) between 1 and 2000
   ),
   constraint dopamine_asset_comments_class_check check (
-    asset_class in ('us_stock', 'kr_stock', 'crypto', 'commodity', 'theme')
+    asset_class in ('us_stock', 'kr_stock', 'jp_stock', 'cn_stock', 'crypto', 'commodity', 'theme')
   )
 );
 alter table public.dopamine_asset_comments enable row level security;
@@ -189,7 +189,7 @@ create table if not exists public.dopamine_asset_move_summaries (
   batch_run_at timestamptz not null default now(),
   created_at timestamptz not null default now(),
   constraint dopamine_move_summaries_class check (
-    asset_class in ('us_stock', 'kr_stock', 'crypto', 'commodity', 'theme')
+    asset_class in ('us_stock', 'kr_stock', 'jp_stock', 'cn_stock', 'crypto', 'commodity', 'theme')
   ),
   constraint dopamine_move_summaries_unique unique (symbol, asset_class, summary_date)
 );
@@ -358,7 +358,7 @@ create table if not exists public.dopamine_interest_asset_scores (
   score_history jsonb not null default '[]'::jsonb,
   updated_at timestamptz not null default now(),
   constraint dopamine_interest_asset_scores_category_check check (
-    category in ('us_stock', 'kr_stock', 'commodity', 'crypto')
+    category in ('us_stock', 'kr_stock', 'jp_stock', 'cn_stock', 'commodity', 'crypto')
   ),
   constraint dopamine_interest_asset_scores_symbol_len check (
     char_length(symbol) between 1 and 64
@@ -427,7 +427,7 @@ create table if not exists public.dopamine_user_favorite_assets (
   created_at timestamptz not null default now(),
   primary key (user_uid, asset_class, symbol),
   constraint dopamine_user_favorite_assets_class_check check (
-    asset_class in ('us_stock', 'kr_stock', 'crypto', 'commodity', 'theme')
+    asset_class in ('us_stock', 'kr_stock', 'jp_stock', 'cn_stock', 'crypto', 'commodity', 'theme')
   ),
   constraint dopamine_user_favorite_assets_symbol_len check (
     char_length(symbol) between 1 and 128

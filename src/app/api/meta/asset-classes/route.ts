@@ -15,6 +15,18 @@ const BODY = {
       order: 20,
     },
     {
+      id: "jp_stock",
+      labelKey: "assetClass.jpStock",
+      defaultEnabled: true,
+      order: 25,
+    },
+    {
+      id: "cn_stock",
+      labelKey: "assetClass.cnStock",
+      defaultEnabled: true,
+      order: 27,
+    },
+    {
       id: "crypto",
       labelKey: "assetClass.crypto",
       defaultEnabled: true,
@@ -28,7 +40,14 @@ const BODY = {
     },
   ],
   defaultFilter: {
-    includeAssetClasses: ["us_stock", "kr_stock", "crypto", "commodity"],
+    includeAssetClasses: [
+      "us_stock",
+      "kr_stock",
+      "jp_stock",
+      "cn_stock",
+      "crypto",
+      "commodity",
+    ],
   },
 } as const;
 

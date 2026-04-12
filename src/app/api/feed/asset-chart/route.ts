@@ -5,7 +5,14 @@ import { jsonWithCors } from "@/lib/cors";
 import type { AssetClass } from "@/lib/types";
 import { fetchYahooOhlcBars, type OhlcBar } from "@/lib/yahoo-chart";
 
-const CLASSES = new Set<AssetClass>(["us_stock", "kr_stock", "crypto", "commodity"]);
+const CLASSES = new Set<AssetClass>([
+  "us_stock",
+  "kr_stock",
+  "jp_stock",
+  "cn_stock",
+  "crypto",
+  "commodity",
+]);
 
 /** `3mo` | `1mo` | `1y` — 일봉 구간 */
 function rangeDays(raw: string | null): number {

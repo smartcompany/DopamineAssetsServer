@@ -5,6 +5,8 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 const ASSET_CLASSES = new Set([
   "us_stock",
   "kr_stock",
+  "jp_stock",
+  "cn_stock",
   "crypto",
   "commodity",
   "theme",
