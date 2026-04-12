@@ -131,12 +131,12 @@ export async function getFeedRankings(
     if (classes.has("jp_stock")) {
       const { rows: r } = await fetchFeedCacheRows(FEED_CACHE_ID.jp_stock);
       rows = [...rows, ...r];
-      basisParts.push("supabase_jp_universe_yahoo");
+      basisParts.push("supabase_jp_screener_yahoo_asia");
     }
     if (classes.has("cn_stock")) {
       const { rows: r } = await fetchFeedCacheRows(FEED_CACHE_ID.cn_stock);
       rows = [...rows, ...r];
-      basisParts.push("supabase_cn_universe_yahoo");
+      basisParts.push("supabase_cn_screener_yahoo_asia");
     }
     if (classes.has("commodity")) {
       const { rows: r } = await fetchFeedCacheRows(FEED_CACHE_ID.commodity);
@@ -162,12 +162,12 @@ export async function getFeedRankings(
     if (classes.has("jp_stock")) {
       const { rows: r } = await fetchFeedCacheRows(FEED_CACHE_ID.jp_stock);
       rows = [...rows, ...r];
-      basisParts.push("supabase_jp_universe_yahoo");
+      basisParts.push("supabase_jp_screener_yahoo_asia");
     }
     if (classes.has("cn_stock")) {
       const { rows: r } = await fetchFeedCacheRows(FEED_CACHE_ID.cn_stock);
       rows = [...rows, ...r];
-      basisParts.push("supabase_cn_universe_yahoo");
+      basisParts.push("supabase_cn_screener_yahoo_asia");
     }
     if (classes.has("commodity")) {
       const { rows: r } = await fetchFeedCacheRows(FEED_CACHE_ID.commodity);

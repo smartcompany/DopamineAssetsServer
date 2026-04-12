@@ -13,11 +13,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchCoinGeckoMarketRowsForCache } from "../src/lib/coingecko-markets";
 import { FEED_CACHE_ID } from "../src/lib/feed-cache-constants";
 import { buildRankedRowFromYahooDaily } from "../src/lib/feed-rankings-row";
-import {
-  CN_STOCK_UNIVERSE,
-  FEED_UNIVERSE,
-  JP_STOCK_UNIVERSE,
-} from "../src/lib/feed-universe";
+import { FEED_UNIVERSE } from "../src/lib/feed-universe";
 import {
   enrichKrStockRowsDisplayNamesFromYahooAndNaver,
   fetchKrStockRowsFromNaver,
@@ -227,14 +223,27 @@ async function main() {
     );
   }
 
-  console.log("[refresh-feed-cache] jp_stock (Yahoo daily, .T universe)…");
+  console.log(
+    "[refresh-feed-cache] jp_stock (Yahoo day_gainers_asia / day_losers_asia → .T)…",
+  );
   try {
-    const jpRows: RankedAssetDto[] = [];
-    for (const entry of JP_STOCK_UNIVERSE) {
-      const row = await buildRankedRowFromYahooDaily(entry);
-      if (row) jpRows.push(row);
-      await sleep(75);
+    const jpGainers = await fetchYahooDayMovers("gainers", 50, {
+      market: "asia_jp",
+    });
+    const jpLosers = await fetchYahooDayMovers("losers", 50, {
+      market: "asia_jp",
+    });
+    const jpBySym = new Map<string, RankedAssetDto>();
+    for (const r of [...jpGainers, ...jpLosers]) {
+      const prev = jpBySym.get(r.symbol);
+      if (
+        !prev ||
+        Math.abs(r.priceChangePct) > Math.abs(prev.priceChangePct)
+      ) {
+        jpBySym.set(r.symbol, r);
+      }
     }
+    const jpRows = [...jpBySym.values()];
     const jpStore = pickGainersLosersForStore(jpRows);
     console.log(
       `[refresh-feed-cache] jp_stock store pre=${jpRows.length} store=${jpStore.length}`,
@@ -247,14 +256,27 @@ async function main() {
     );
   }
 
-  console.log("[refresh-feed-cache] cn_stock (Yahoo daily, .SS/.SZ universe)…");
+  console.log(
+    "[refresh-feed-cache] cn_stock (Yahoo day_*_asia → .SS / .SZ)…",
+  );
   try {
-    const cnRows: RankedAssetDto[] = [];
-    for (const entry of CN_STOCK_UNIVERSE) {
-      const row = await buildRankedRowFromYahooDaily(entry);
-      if (row) cnRows.push(row);
-      await sleep(75);
+    const cnGainers = await fetchYahooDayMovers("gainers", 50, {
+      market: "asia_cn",
+    });
+    const cnLosers = await fetchYahooDayMovers("losers", 50, {
+      market: "asia_cn",
+    });
+    const cnBySym = new Map<string, RankedAssetDto>();
+    for (const r of [...cnGainers, ...cnLosers]) {
+      const prev = cnBySym.get(r.symbol);
+      if (
+        !prev ||
+        Math.abs(r.priceChangePct) > Math.abs(prev.priceChangePct)
+      ) {
+        cnBySym.set(r.symbol, r);
+      }
     }
+    const cnRows = [...cnBySym.values()];
     const cnStore = pickGainersLosersForStore(cnRows);
     console.log(
       `[refresh-feed-cache] cn_stock store pre=${cnRows.length} store=${cnStore.length}`,
