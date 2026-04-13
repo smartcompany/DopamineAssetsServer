@@ -143,7 +143,6 @@ export async function buildYahooMarketBrief(): Promise<{
 
   const ko = buildParagraphKo(settled);
   const en = buildParagraphEn(settled);
-
   const fallbackKo =
     "지금은 주요 지수 데이터를 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.";
   const fallbackEn =

@@ -25,6 +25,9 @@ import { getThemeAverageOhlcBars } from "../src/lib/theme-chart-service";
 import type { RankedAssetDto } from "../src/lib/types";
 import { THEME_CACHE_ID } from "../src/lib/theme-cache-constants";
 
+const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
+const DEFAULT_OPENAI_MODEL = "gpt-5-mini";
+
 async function sleep(ms: number): Promise<void> {
   await new Promise((r) => setTimeout(r, ms));
 }
@@ -117,6 +120,147 @@ async function upsertThemeCacheIfHasData(
   );
 }
 
+type MarketSummaryCacheRow = {
+  summaryEn: string;
+  attributionEn: string;
+  generatedAt: string;
+  basis: string;
+  source: "openai";
+};
+
+async function upsertFeedCacheObjectIfHasData(
+  supabase: SupabaseClient,
+  id: string,
+  payload: object | null,
+): Promise<void> {
+  if (!payload) {
+    console.warn(
+      `[refresh-feed-cache] skip upsert dopamine_feed_cache id=${id} reason=empty_payload`,
+    );
+    return;
+  }
+  const updatedAt = new Date().toISOString();
+  const { error } = await supabase.from("dopamine_feed_cache").upsert(
+    {
+      id,
+      items: payload,
+      updated_at: updatedAt,
+    },
+    { onConflict: "id" },
+  );
+  if (error) {
+    console.error(
+      `[refresh-feed-cache] skip upsert dopamine_feed_cache id=${id} reason=supabase_error`,
+      error,
+    );
+    return;
+  }
+  console.log(
+    `[refresh-feed-cache] upserted dopamine_feed_cache id=${id} payload=object at ${updatedAt}`,
+  );
+}
+
+function summarizeMoversForPrompt(
+  classLabel: string,
+  items: RankedAssetDto[],
+): { classLabel: string; gainers: string[]; losers: string[] } {
+  const gainers = items
+    .filter((x) => x.priceChangePct > 0)
+    .sort((a, b) => b.priceChangePct - a.priceChangePct)
+    .slice(0, 4)
+    .map((x) => `${x.symbol} ${x.priceChangePct.toFixed(2)}%`);
+  const losers = items
+    .filter((x) => x.priceChangePct < 0)
+    .sort((a, b) => a.priceChangePct - b.priceChangePct)
+    .slice(0, 4)
+    .map((x) => `${x.symbol} ${x.priceChangePct.toFixed(2)}%`);
+  return { classLabel, gainers, losers };
+}
+
+async function buildMarketSummaryFromCaches(params: {
+  us: RankedAssetDto[];
+  kr: RankedAssetDto[];
+  jp: RankedAssetDto[];
+  cn: RankedAssetDto[];
+  crypto: RankedAssetDto[];
+  commodity: RankedAssetDto[];
+}): Promise<MarketSummaryCacheRow | null> {
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  if (!apiKey) {
+    console.warn("[refresh-feed-cache] market_summary skip reason=no_openai_key");
+    return null;
+  }
+
+  const blocks = [
+    summarizeMoversForPrompt("US stocks", params.us),
+    summarizeMoversForPrompt("Korea stocks", params.kr),
+    summarizeMoversForPrompt("Japan stocks", params.jp),
+    summarizeMoversForPrompt("China stocks", params.cn),
+    summarizeMoversForPrompt("Crypto", params.crypto),
+    summarizeMoversForPrompt("Commodities", params.commodity),
+  ];
+
+  const res = await fetch(OPENAI_CHAT_COMPLETIONS_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: DEFAULT_OPENAI_MODEL,
+      max_completion_tokens: 2000,
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a concise global market analyst. Write a short neutral market summary in English only.",
+        },
+        {
+          role: "user",
+          content: JSON.stringify({
+            instruction:
+              "Using the mover snapshots below, write 2-4 sentences plain-English market commentary. Mention broad risk-on/risk-off tone and 1-2 notable movers. No investment advice. Return JSON with keys: summaryEn, attributionEn.",
+            snapshots: blocks,
+          }),
+        },
+      ],
+      response_format: { type: "json_object" },
+    }),
+  });
+  if (!res.ok) {
+    const t = await res.text().catch(() => "");
+    throw new Error(`OpenAI market_summary HTTP ${res.status}: ${t.slice(0, 280)}`);
+  }
+  const data = (await res.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  const raw = data.choices?.[0]?.message?.content?.trim();
+  if (!raw) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  const o = parsed as { summaryEn?: unknown; attributionEn?: unknown };
+  const summaryEn =
+    typeof o.summaryEn === "string" && o.summaryEn.trim() !== ""
+      ? o.summaryEn.trim().slice(0, 1200)
+      : null;
+  const attributionEn =
+    typeof o.attributionEn === "string" && o.attributionEn.trim() !== ""
+      ? o.attributionEn.trim().slice(0, 420)
+      : "Based on daily mover snapshots from cached assets.";
+  if (!summaryEn) return null;
+  return {
+    summaryEn,
+    attributionEn,
+    generatedAt: new Date().toISOString(),
+    basis: "feed_cache_movers_v1",
+    source: "openai",
+  };
+}
+
 async function main() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const key = process.env.NEXT_PUBLIC_SUPABASE_KEY?.trim();
@@ -130,6 +274,7 @@ async function main() {
   const supabase = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+  const marketSummaryInputs = new Map<string, RankedAssetDto[]>();
 
   console.log("[refresh-feed-cache] crypto (CoinGecko)…");
   try {
@@ -141,6 +286,7 @@ async function main() {
       `[refresh-feed-cache] crypto store pre=${cryptoRows.length} store=${cryptoStore.length}`,
     );
     await upsertRankedFeedIfHasData(supabase, FEED_CACHE_ID.crypto, cryptoStore);
+    marketSummaryInputs.set(FEED_CACHE_ID.crypto, cryptoStore);
   } catch (e) {
     console.error(
       "[refresh-feed-cache] crypto section failed, skip upsert",
@@ -160,6 +306,7 @@ async function main() {
     );
     await enrichKrStockRowsDisplayNamesFromYahooAndNaver(krStore);
     await upsertRankedFeedIfHasData(supabase, FEED_CACHE_ID.kr_stock, krStore);
+    marketSummaryInputs.set(FEED_CACHE_ID.kr_stock, krStore);
   } catch (e) {
     console.error(
       "[refresh-feed-cache] kr_stock section failed, skip upsert",
@@ -191,6 +338,7 @@ async function main() {
       FEED_CACHE_ID.us_screener,
       usScreenerStore,
     );
+    marketSummaryInputs.set(FEED_CACHE_ID.us_screener, usScreenerStore);
   } catch (e) {
     console.error(
       "[refresh-feed-cache] us_screener section failed, skip upsert",
@@ -249,6 +397,7 @@ async function main() {
       `[refresh-feed-cache] jp_stock store pre=${jpRows.length} store=${jpStore.length}`,
     );
     await upsertRankedFeedIfHasData(supabase, FEED_CACHE_ID.jp_stock, jpStore);
+    marketSummaryInputs.set(FEED_CACHE_ID.jp_stock, jpStore);
   } catch (e) {
     console.error(
       "[refresh-feed-cache] jp_stock section failed, skip upsert",
@@ -282,6 +431,7 @@ async function main() {
       `[refresh-feed-cache] cn_stock store pre=${cnRows.length} store=${cnStore.length}`,
     );
     await upsertRankedFeedIfHasData(supabase, FEED_CACHE_ID.cn_stock, cnStore);
+    marketSummaryInputs.set(FEED_CACHE_ID.cn_stock, cnStore);
   } catch (e) {
     console.error(
       "[refresh-feed-cache] cn_stock section failed, skip upsert",
@@ -309,9 +459,32 @@ async function main() {
       FEED_CACHE_ID.commodity,
       commodityStore,
     );
+    marketSummaryInputs.set(FEED_CACHE_ID.commodity, commodityStore);
   } catch (e) {
     console.error(
       "[refresh-feed-cache] commodity section failed, skip upsert",
+      e,
+    );
+  }
+
+  console.log("[refresh-feed-cache] market_summary (OpenAI from 6 asset buckets)…");
+  try {
+    const summaryRow = await buildMarketSummaryFromCaches({
+      us: marketSummaryInputs.get(FEED_CACHE_ID.us_screener) ?? [],
+      kr: marketSummaryInputs.get(FEED_CACHE_ID.kr_stock) ?? [],
+      jp: marketSummaryInputs.get(FEED_CACHE_ID.jp_stock) ?? [],
+      cn: marketSummaryInputs.get(FEED_CACHE_ID.cn_stock) ?? [],
+      crypto: marketSummaryInputs.get(FEED_CACHE_ID.crypto) ?? [],
+      commodity: marketSummaryInputs.get(FEED_CACHE_ID.commodity) ?? [],
+    });
+    await upsertFeedCacheObjectIfHasData(
+      supabase,
+      FEED_CACHE_ID.market_summary,
+      summaryRow,
+    );
+  } catch (e) {
+    console.error(
+      "[refresh-feed-cache] market_summary section failed, skip upsert",
       e,
     );
   }

@@ -7,6 +7,7 @@ export const FEED_CACHE_ID = {
   us_universe: "us_universe",
   jp_stock: "jp_stock",
   cn_stock: "cn_stock",
+  market_summary: "market_summary",
   commodity: "commodity",
 } as const;
 
