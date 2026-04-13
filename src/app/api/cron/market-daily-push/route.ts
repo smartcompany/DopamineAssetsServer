@@ -1,5 +1,6 @@
 import { buildYahooMarketBrief } from "@/lib/yahoo-market-brief";
 import { jsonWithCors } from "@/lib/cors";
+import { FEED_CACHE_ID } from "@/lib/feed-cache-constants";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { getFeedRankings } from "@/lib/feed-rankings-service";
 import {
@@ -42,6 +43,127 @@ function fmtPct(p: number): string {
   return `${sign}${v.toFixed(1)}%`;
 }
 
+const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
+const OPENAI_MODEL = "gpt-5-mini";
+
+function summarizeMoversForPrompt(
+  classLabel: string,
+  items: Array<{ symbol: string; priceChangePct: number }>,
+): { classLabel: string; gainers: string[]; losers: string[] } {
+  const gainers = items
+    .filter((x) => x.priceChangePct > 0)
+    .sort((a, b) => b.priceChangePct - a.priceChangePct)
+    .slice(0, 4)
+    .map((x) => `${x.symbol} ${x.priceChangePct.toFixed(2)}%`);
+  const losers = items
+    .filter((x) => x.priceChangePct < 0)
+    .sort((a, b) => a.priceChangePct - b.priceChangePct)
+    .slice(0, 4)
+    .map((x) => `${x.symbol} ${x.priceChangePct.toFixed(2)}%`);
+  return { classLabel, gainers, losers };
+}
+
+async function buildMarketSummaryEnFromFeedCache(): Promise<{
+  summaryEn: string;
+  attributionEn: string;
+  generatedAt: string;
+  basis: string;
+  source: "openai";
+} | null> {
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  if (!apiKey) {
+    console.warn("[market-daily-push] market_summary skip reason=no_openai_key");
+    return null;
+  }
+  const makeParams = (include: string) =>
+    new URLSearchParams({ limit: "50", source: "yahoo_us", include });
+  const [us, kr, jp, cn, crypto, commodity] = await Promise.all([
+    getFeedRankings("up", makeParams("us_stock")),
+    getFeedRankings("up", makeParams("kr_stock")),
+    getFeedRankings("up", makeParams("jp_stock")),
+    getFeedRankings("up", makeParams("cn_stock")),
+    getFeedRankings("up", makeParams("crypto")),
+    getFeedRankings("up", makeParams("commodity")),
+  ]);
+  const blocks = [
+    summarizeMoversForPrompt("US stocks", us.items),
+    summarizeMoversForPrompt("Korea stocks", kr.items),
+    summarizeMoversForPrompt("Japan stocks", jp.items),
+    summarizeMoversForPrompt("China stocks", cn.items),
+    summarizeMoversForPrompt("Crypto", crypto.items),
+    summarizeMoversForPrompt("Commodities", commodity.items),
+  ];
+  console.log(
+    "[market-daily-push] market_summary openai start",
+    JSON.stringify(
+      blocks.map((b) => ({
+        classLabel: b.classLabel,
+        gainers: b.gainers.length,
+        losers: b.losers.length,
+      })),
+    ),
+  );
+  const res = await fetch(OPENAI_CHAT_COMPLETIONS_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      max_completion_tokens: 900,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a concise global market analyst. Write a short neutral market summary in English only.",
+        },
+        {
+          role: "user",
+          content: JSON.stringify({
+            instruction:
+              "Using the mover snapshots below, write 2-4 plain-English sentences. Mention broad risk-on/risk-off tone and 1-2 notable movers. No investment advice. Return JSON with keys: summaryEn, attributionEn.",
+            snapshots: blocks,
+          }),
+        },
+      ],
+    }),
+  });
+  if (!res.ok) {
+    const t = await res.text().catch(() => "");
+    throw new Error(`OpenAI market_summary HTTP ${res.status}: ${t.slice(0, 300)}`);
+  }
+  const data = (await res.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  const raw = data.choices?.[0]?.message?.content?.trim();
+  if (!raw) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  const o = parsed as { summaryEn?: unknown; attributionEn?: unknown };
+  const summaryEn =
+    typeof o.summaryEn === "string" && o.summaryEn.trim() !== ""
+      ? o.summaryEn.trim().slice(0, 1200)
+      : null;
+  if (!summaryEn) return null;
+  const attributionEn =
+    typeof o.attributionEn === "string" && o.attributionEn.trim() !== ""
+      ? o.attributionEn.trim().slice(0, 420)
+      : "Based on daily mover snapshots from cached assets.";
+  return {
+    summaryEn,
+    attributionEn,
+    generatedAt: new Date().toISOString(),
+    basis: "feed_cache_movers_v1",
+    source: "openai",
+  };
+}
+
 export async function POST(request: Request) {
   if (!authorizeCron(request)) {
     return jsonWithCors({ error: "unauthorized" }, { status: 401 });
@@ -67,6 +189,30 @@ export async function POST(request: Request) {
     const { briefingKo, briefingEn } = await buildYahooMarketBrief();
     const supabase = getSupabaseAdmin();
     const dayKst = kstDateString(new Date());
+
+    // Daily-event(10:00 KST) 경로에서만 시황 캐시를 갱신한다.
+    try {
+      const summaryRow = await buildMarketSummaryEnFromFeedCache();
+      if (summaryRow) {
+        const updatedAt = new Date().toISOString();
+        await supabase.from("dopamine_feed_cache").upsert(
+          {
+            id: FEED_CACHE_ID.market_summary,
+            items: summaryRow,
+            updated_at: updatedAt,
+          },
+          { onConflict: "id" },
+        );
+        console.log("[market-daily-push] market_summary upserted", {
+          id: FEED_CACHE_ID.market_summary,
+          summaryLen: summaryRow.summaryEn.length,
+        });
+      } else {
+        console.warn("[market-daily-push] market_summary skip reason=empty_summary");
+      }
+    } catch (e) {
+      console.error("[market-daily-push] market_summary generation failed", e);
+    }
 
     // NOTE: 기존 DB에 locale 컬럼이 아직 없는 경우(마이그레이션 미적용)도
     // 크론이 죽지 않도록 폴백한다.
