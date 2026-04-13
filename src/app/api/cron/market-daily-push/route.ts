@@ -170,6 +170,9 @@ export async function POST(request: Request) {
   }
 
   try {
+    let marketSummaryGenerated = false;
+    let marketSummarySkipReason: string | null = null;
+
     // "오늘의 마켓 요약"용 A/B (상승 1등/하락 1등)
     // - getFeedRankings는 supabase dopamine_feed_cache만 사용 (네이버/야후 즉시 호출 없음)
     const rankingParams = new URLSearchParams({
@@ -195,7 +198,7 @@ export async function POST(request: Request) {
       const summaryRow = await buildMarketSummaryEnFromFeedCache();
       if (summaryRow) {
         const updatedAt = new Date().toISOString();
-        await supabase.from("dopamine_feed_cache").upsert(
+        const { error: upsertErr } = await supabase.from("dopamine_feed_cache").upsert(
           {
             id: FEED_CACHE_ID.market_summary,
             items: summaryRow,
@@ -203,14 +206,26 @@ export async function POST(request: Request) {
           },
           { onConflict: "id" },
         );
+        if (upsertErr) {
+          marketSummaryGenerated = false;
+          marketSummarySkipReason = "upsert_error";
+          console.error("[market-daily-push] market_summary upsert failed", upsertErr);
+        } else {
+          marketSummaryGenerated = true;
+          marketSummarySkipReason = null;
+        }
         console.log("[market-daily-push] market_summary upserted", {
           id: FEED_CACHE_ID.market_summary,
           summaryLen: summaryRow.summaryEn.length,
         });
       } else {
+        marketSummaryGenerated = false;
+        marketSummarySkipReason = "empty_summary_or_no_key";
         console.warn("[market-daily-push] market_summary skip reason=empty_summary");
       }
     } catch (e) {
+      marketSummaryGenerated = false;
+      marketSummarySkipReason = "generation_failed";
       console.error("[market-daily-push] market_summary generation failed", e);
     }
 
@@ -335,6 +350,8 @@ export async function POST(request: Request) {
     return jsonWithCors({
       ok: true,
       dayUtc: dayKst,
+      marketSummaryGenerated,
+      marketSummarySkipReason,
       usersWithTokens: byUid.size,
       attempted,
       sent,

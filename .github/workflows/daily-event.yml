@@ -22,10 +22,11 @@ jobs:
             echo "Missing CRON_API_BASE_URL or CRON_SECRET"
             exit 1
           fi
-          curl -sS -X POST "${CRON_API_BASE_URL}/api/cron/market-daily-push" \
+          RESPONSE=$(curl -sS -X POST "${CRON_API_BASE_URL}/api/cron/market-daily-push" \
             -H "Authorization: Bearer ${CRON_SECRET}" \
             -H "Content-Type: application/json" \
-            --fail
+            --fail)
+          echo "market-daily-push response: ${RESPONSE}"
 
       - name: Interest assets → Supabase (OpenAI)
         env:
