@@ -117,13 +117,13 @@ async function buildMarketSummaryEnFromFeedCache(): Promise<{
         {
           role: "system",
           content:
-            "You are a concise global market analyst. Write a short neutral market summary in English only.",
+            "당신은 글로벌 시장 분석가다. 시장 요약을 영어로만 작성하라.",
         },
         {
           role: "user",
           content: JSON.stringify({
             instruction:
-              "Using the mover snapshots below, write 2-4 plain-English sentences. Mention broad risk-on/risk-off tone and 1-2 notable movers. No investment advice. Return JSON with keys: summaryEn, attributionEn.",
+              "아래 급등/급락 데이터를 사용해서 영어로 시장 요약을 작성하라. 니가 판단한 현재 시장의 분위기를 주요 종목을 언급 하면서 재미있게 표현해 줘. 아래 형식의 JSON을 반환하되 응답은 영어로만 작성해 줘. {\"summaryEn\":\"string (English)\",\"attributionEn\":\"string\"}.",
             snapshots: blocks,
           }),
         },
