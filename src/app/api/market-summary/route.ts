@@ -3,6 +3,9 @@ import { FEED_CACHE_ID } from "@/lib/feed-cache-constants";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { buildYahooMarketBrief } from "@/lib/yahoo-market-brief";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET() {
   const {
     briefingKo,
@@ -33,9 +36,9 @@ export async function GET() {
       : null;
 
   return jsonWithCors({
-    briefing: briefingKo,
+    briefing: cachedSummaryEn ?? briefingKo,
     briefingEn: cachedSummaryEn ?? briefingEn,
-    attribution: attributionKo,
+    attribution: cachedAttributionEn ?? attributionKo,
     attributionEn: cachedAttributionEn ?? attributionEn,
     kimchiPremiumPct: null,
     usdKrw: null,
