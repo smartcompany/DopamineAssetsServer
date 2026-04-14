@@ -13,18 +13,32 @@ export type HotMoverDiscussionConfig = {
   push_title_ko: string;
   /** 푸시 제목 (영) */
   push_title_en: string;
+  /** 푸시 제목 (일) */
+  push_title_ja: string;
+  /** 푸시 제목 (중-간체) */
+  push_title_zh: string;
   /** 푸시 본문 (한). `{direction}` = 급등 중 / 급락 중 */
   push_body_template_ko: string;
   /** 푸시 본문 (영). `{direction}` = surging / sliding (예: … is {direction} …) */
   push_body_template_en: string;
+  /** 푸시 본문 (일). `{direction}` = 急騰中 / 急落中 */
+  push_body_template_ja: string;
+  /** 푸시 본문 (중-간체). `{direction}` = 飙升中 / 下跌中 */
+  push_body_template_zh: string;
 };
 
 export const HOT_MOVER_PUSH_DEFAULT_TITLE_KO = "🔥 지금 뜨는 토론";
 export const HOT_MOVER_PUSH_DEFAULT_TITLE_EN = "🔥 Heating up";
+export const HOT_MOVER_PUSH_DEFAULT_TITLE_JA = "🔥 今アツい討論";
+export const HOT_MOVER_PUSH_DEFAULT_TITLE_ZH = "🔥 正在热议";
 export const HOT_MOVER_PUSH_DEFAULT_BODY_KO =
   "💬 {name} {direction} ({pct}) · 커뮤니티 온도 미쳤어요 👀 지금 보러 와요!";
 export const HOT_MOVER_PUSH_DEFAULT_BODY_EN =
   "💬 {name} is {direction} ({pct}) — Community's buzzing 👀 Tap to see what's up!";
+export const HOT_MOVER_PUSH_DEFAULT_BODY_JA =
+  "💬 {name} が{direction}（{pct}）・コミュニティが大盛り上がり 👀 今すぐチェック！";
+export const HOT_MOVER_PUSH_DEFAULT_BODY_ZH =
+  "💬 {name} {direction}（{pct}）· 社区热度爆表 👀 现在就来看看！";
 
 export const HOT_MOVER_DISCUSSION_CONFIG_DEFAULTS: HotMoverDiscussionConfig = {
   use_time_window: true,
@@ -33,8 +47,12 @@ export const HOT_MOVER_DISCUSSION_CONFIG_DEFAULTS: HotMoverDiscussionConfig = {
   min_root_view_count: 0,
   push_title_ko: HOT_MOVER_PUSH_DEFAULT_TITLE_KO,
   push_title_en: HOT_MOVER_PUSH_DEFAULT_TITLE_EN,
+  push_title_ja: HOT_MOVER_PUSH_DEFAULT_TITLE_JA,
+  push_title_zh: HOT_MOVER_PUSH_DEFAULT_TITLE_ZH,
   push_body_template_ko: HOT_MOVER_PUSH_DEFAULT_BODY_KO,
   push_body_template_en: HOT_MOVER_PUSH_DEFAULT_BODY_EN,
+  push_body_template_ja: HOT_MOVER_PUSH_DEFAULT_BODY_JA,
+  push_body_template_zh: HOT_MOVER_PUSH_DEFAULT_BODY_ZH,
 };
 
 const MAX_PUSH_TITLE_LEN = 80;
@@ -91,6 +109,16 @@ function normalizeRow(
       MAX_PUSH_TITLE_LEN,
       HOT_MOVER_PUSH_DEFAULT_TITLE_EN,
     ),
+    push_title_ja: clipTemplate(
+      typeof r.push_title_ja === "string" ? r.push_title_ja : "",
+      MAX_PUSH_TITLE_LEN,
+      HOT_MOVER_PUSH_DEFAULT_TITLE_JA,
+    ),
+    push_title_zh: clipTemplate(
+      typeof r.push_title_zh === "string" ? r.push_title_zh : "",
+      MAX_PUSH_TITLE_LEN,
+      HOT_MOVER_PUSH_DEFAULT_TITLE_ZH,
+    ),
     push_body_template_ko: clipTemplate(
       typeof r.push_body_template_ko === "string"
         ? r.push_body_template_ko
@@ -105,6 +133,20 @@ function normalizeRow(
       MAX_PUSH_BODY_TEMPLATE_LEN,
       HOT_MOVER_PUSH_DEFAULT_BODY_EN,
     ),
+    push_body_template_ja: clipTemplate(
+      typeof r.push_body_template_ja === "string"
+        ? r.push_body_template_ja
+        : "",
+      MAX_PUSH_BODY_TEMPLATE_LEN,
+      HOT_MOVER_PUSH_DEFAULT_BODY_JA,
+    ),
+    push_body_template_zh: clipTemplate(
+      typeof r.push_body_template_zh === "string"
+        ? r.push_body_template_zh
+        : "",
+      MAX_PUSH_BODY_TEMPLATE_LEN,
+      HOT_MOVER_PUSH_DEFAULT_BODY_ZH,
+    ),
   };
 }
 
@@ -114,7 +156,7 @@ export async function loadHotMoverDiscussionConfig(
   const { data, error } = await supabase
     .from(CONFIG_TABLE)
     .select(
-      "use_time_window, window_hours, min_thread_comments, min_root_view_count, push_title_ko, push_title_en, push_body_template_ko, push_body_template_en",
+      "use_time_window, window_hours, min_thread_comments, min_root_view_count, push_title_ko, push_title_en, push_title_ja, push_title_zh, push_body_template_ko, push_body_template_en, push_body_template_ja, push_body_template_zh",
     )
     .eq("id", 1)
     .maybeSingle();
@@ -134,8 +176,12 @@ export type HotMoverDiscussionConfigPayload = {
   minRootViewCount: number;
   pushTitleKo: string;
   pushTitleEn: string;
+  pushTitleJa: string;
+  pushTitleZh: string;
   pushBodyTemplateKo: string;
   pushBodyTemplateEn: string;
+  pushBodyTemplateJa: string;
+  pushBodyTemplateZh: string;
 };
 
 export function configToPayload(c: HotMoverDiscussionConfig): HotMoverDiscussionConfigPayload {
@@ -146,8 +192,12 @@ export function configToPayload(c: HotMoverDiscussionConfig): HotMoverDiscussion
     minRootViewCount: c.min_root_view_count,
     pushTitleKo: c.push_title_ko,
     pushTitleEn: c.push_title_en,
+    pushTitleJa: c.push_title_ja,
+    pushTitleZh: c.push_title_zh,
     pushBodyTemplateKo: c.push_body_template_ko,
     pushBodyTemplateEn: c.push_body_template_en,
+    pushBodyTemplateJa: c.push_body_template_ja,
+    pushBodyTemplateZh: c.push_body_template_zh,
   };
 }
 
@@ -182,6 +232,14 @@ export function parseConfigPayload(
     typeof o.pushTitleEn === "string"
       ? o.pushTitleEn.trim()
       : HOT_MOVER_PUSH_DEFAULT_TITLE_EN;
+  const tj =
+    typeof o.pushTitleJa === "string"
+      ? o.pushTitleJa.trim()
+      : HOT_MOVER_PUSH_DEFAULT_TITLE_JA;
+  const tz =
+    typeof o.pushTitleZh === "string"
+      ? o.pushTitleZh.trim()
+      : HOT_MOVER_PUSH_DEFAULT_TITLE_ZH;
   const bk =
     typeof o.pushBodyTemplateKo === "string"
       ? o.pushBodyTemplateKo.trim()
@@ -190,6 +248,14 @@ export function parseConfigPayload(
     typeof o.pushBodyTemplateEn === "string"
       ? o.pushBodyTemplateEn.trim()
       : HOT_MOVER_PUSH_DEFAULT_BODY_EN;
+  const bj =
+    typeof o.pushBodyTemplateJa === "string"
+      ? o.pushBodyTemplateJa.trim()
+      : HOT_MOVER_PUSH_DEFAULT_BODY_JA;
+  const bz =
+    typeof o.pushBodyTemplateZh === "string"
+      ? o.pushBodyTemplateZh.trim()
+      : HOT_MOVER_PUSH_DEFAULT_BODY_ZH;
 
   if (tk.length === 0 || tk.length > MAX_PUSH_TITLE_LEN) {
     return { ok: false, error: "invalid_pushTitleKo" };
@@ -197,11 +263,23 @@ export function parseConfigPayload(
   if (te.length === 0 || te.length > MAX_PUSH_TITLE_LEN) {
     return { ok: false, error: "invalid_pushTitleEn" };
   }
+  if (tj.length === 0 || tj.length > MAX_PUSH_TITLE_LEN) {
+    return { ok: false, error: "invalid_pushTitleJa" };
+  }
+  if (tz.length === 0 || tz.length > MAX_PUSH_TITLE_LEN) {
+    return { ok: false, error: "invalid_pushTitleZh" };
+  }
   if (bk.length === 0 || bk.length > MAX_PUSH_BODY_TEMPLATE_LEN) {
     return { ok: false, error: "invalid_pushBodyTemplateKo" };
   }
   if (be.length === 0 || be.length > MAX_PUSH_BODY_TEMPLATE_LEN) {
     return { ok: false, error: "invalid_pushBodyTemplateEn" };
+  }
+  if (bj.length === 0 || bj.length > MAX_PUSH_BODY_TEMPLATE_LEN) {
+    return { ok: false, error: "invalid_pushBodyTemplateJa" };
+  }
+  if (bz.length === 0 || bz.length > MAX_PUSH_BODY_TEMPLATE_LEN) {
+    return { ok: false, error: "invalid_pushBodyTemplateZh" };
   }
 
   return {
@@ -213,8 +291,12 @@ export function parseConfigPayload(
       min_root_view_count: Math.floor(mv),
       push_title_ko: tk,
       push_title_en: te,
+      push_title_ja: tj,
+      push_title_zh: tz,
       push_body_template_ko: bk,
       push_body_template_en: be,
+      push_body_template_ja: bj,
+      push_body_template_zh: bz,
     },
   };
 }
@@ -232,8 +314,12 @@ export async function saveHotMoverDiscussionConfig(
       min_root_view_count: config.min_root_view_count,
       push_title_ko: config.push_title_ko,
       push_title_en: config.push_title_en,
+      push_title_ja: config.push_title_ja,
+      push_title_zh: config.push_title_zh,
       push_body_template_ko: config.push_body_template_ko,
       push_body_template_en: config.push_body_template_en,
+      push_body_template_ja: config.push_body_template_ja,
+      push_body_template_zh: config.push_body_template_zh,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "id" },

@@ -11,7 +11,6 @@ import {
 } from "@/lib/hot-mover-discussion-push";
 import {
   loadPushPrefs,
-  pushLangFromDeviceLocale,
   sendFcmToTokens,
 } from "@/lib/push-notifications";
 
@@ -41,6 +40,15 @@ function fmtPct(p: number): string {
   const v = Number.isFinite(p) ? p : 0;
   const sign = v > 0 ? "+" : "";
   return `${sign}${v.toFixed(1)}%`;
+}
+
+type HotMoverPushLang = "ko" | "en" | "ja" | "zh";
+function hotMoverPushLangFromLocale(locale: string | undefined): HotMoverPushLang {
+  const raw = typeof locale === "string" ? locale.trim().toLowerCase() : "";
+  if (raw.startsWith("ja")) return "ja";
+  if (raw.startsWith("zh")) return "zh";
+  if (raw.startsWith("en")) return "en";
+  return "ko";
 }
 
 export async function POST(request: Request) {
@@ -141,7 +149,7 @@ export async function POST(request: Request) {
 
     const byUid = new Map<
       string,
-      { fcm_token: string; pushLang: "ko" | "en" }
+      { fcm_token: string; pushLang: HotMoverPushLang }
     >();
     for (const r of tokenRows ?? []) {
       const u = r.uid as string;
@@ -149,7 +157,7 @@ export async function POST(request: Request) {
       if (!u || !t) continue;
       byUid.set(u, {
         fcm_token: t,
-        pushLang: pushLangFromDeviceLocale(r.locale),
+        pushLang: hotMoverPushLangFromLocale(r.locale),
       });
     }
 
@@ -178,30 +186,38 @@ export async function POST(request: Request) {
 
       const directionKo = up ? "급등 중" : "급락 중";
       const directionEn = up ? "surging" : "sliding";
+      const directionJa = up ? "急騰中" : "急落中";
+      const directionZh = up ? "飙升中" : "下跌中";
 
-      const titleRaw =
-        preferredLocale === "en"
-          ? interpolateHotMoverPushTemplate(discussionConfig.push_title_en, {
-              name,
-              pct,
-              direction: directionEn,
-            })
-          : interpolateHotMoverPushTemplate(discussionConfig.push_title_ko, {
-              name,
-              pct,
-              direction: directionKo,
-            });
-
-      const bodyRaw =
-        preferredLocale === "en"
-          ? interpolateHotMoverPushTemplate(
-              discussionConfig.push_body_template_en,
-              { name, pct, direction: directionEn },
-            )
-          : interpolateHotMoverPushTemplate(
-              discussionConfig.push_body_template_ko,
-              { name, pct, direction: directionKo },
-            );
+      const templateByLang: Record<
+        HotMoverPushLang,
+        { title: string; body: string; direction: string }
+      > = {
+        ko: {
+          title: discussionConfig.push_title_ko,
+          body: discussionConfig.push_body_template_ko,
+          direction: directionKo,
+        },
+        en: {
+          title: discussionConfig.push_title_en,
+          body: discussionConfig.push_body_template_en,
+          direction: directionEn,
+        },
+        ja: {
+          title: discussionConfig.push_title_ja,
+          body: discussionConfig.push_body_template_ja,
+          direction: directionJa,
+        },
+        zh: {
+          title: discussionConfig.push_title_zh,
+          body: discussionConfig.push_body_template_zh,
+          direction: directionZh,
+        },
+      };
+      const tpl = templateByLang[preferredLocale];
+      const vars = { name, pct, direction: tpl.direction };
+      const titleRaw = interpolateHotMoverPushTemplate(tpl.title, vars);
+      const bodyRaw = interpolateHotMoverPushTemplate(tpl.body, vars);
 
       const title = truncate(titleRaw, 65);
       const body = truncate(bodyRaw, 180);

@@ -45,23 +45,37 @@ type HotMoverDiscussionForm = {
   minRootViewCount: number;
   pushTitleKo: string;
   pushTitleEn: string;
+  pushTitleJa: string;
+  pushTitleZh: string;
   pushBodyTemplateKo: string;
   pushBodyTemplateEn: string;
+  pushBodyTemplateJa: string;
+  pushBodyTemplateZh: string;
 };
 
 const HMD_DEFAULT_PUSH: Pick<
   HotMoverDiscussionForm,
   | "pushTitleKo"
   | "pushTitleEn"
+  | "pushTitleJa"
+  | "pushTitleZh"
   | "pushBodyTemplateKo"
   | "pushBodyTemplateEn"
+  | "pushBodyTemplateJa"
+  | "pushBodyTemplateZh"
 > = {
   pushTitleKo: "🔥 지금 뜨는 토론",
   pushTitleEn: "🔥 Heating up",
+  pushTitleJa: "🔥 今アツい討論",
+  pushTitleZh: "🔥 正在热议",
   pushBodyTemplateKo:
     "💬 {name} {direction} ({pct}) · 커뮤니티 온도 미쳤어요 👀 지금 보러 와요!",
   pushBodyTemplateEn:
     "💬 {name} is {direction} ({pct}) — Community's buzzing 👀 Tap to see what's up!",
+  pushBodyTemplateJa:
+    "💬 {name} が{direction}（{pct}）・コミュニティが大盛り上がり 👀 今すぐチェック！",
+  pushBodyTemplateZh:
+    "💬 {name} {direction}（{pct}）· 社区热度爆表 👀 现在就来看看！",
 };
 
 function getVerdictLabel(v: string | null): string {
@@ -111,7 +125,9 @@ export default function DashboardPage() {
   const [hmdLoadError, setHmdLoadError] = useState(false);
   const [hmdSaveLoading, setHmdSaveLoading] = useState(false);
   /** 푸시 문구 편집 탭: 한국어 / English */
-  const [hmdPushLocale, setHmdPushLocale] = useState<"ko" | "en">("ko");
+  const [hmdPushLocale, setHmdPushLocale] = useState<
+    "ko" | "en" | "ja" | "zh"
+  >("ko");
   const [activeTab, setActiveTab] = useState<"reports" | "push">("reports");
 
   const fetchTargetDetail = async (
@@ -237,10 +253,16 @@ export default function DashboardPage() {
             minRootViewCount: c.minRootViewCount,
             pushTitleKo: c.pushTitleKo ?? HMD_DEFAULT_PUSH.pushTitleKo,
             pushTitleEn: c.pushTitleEn ?? HMD_DEFAULT_PUSH.pushTitleEn,
+            pushTitleJa: c.pushTitleJa ?? HMD_DEFAULT_PUSH.pushTitleJa,
+            pushTitleZh: c.pushTitleZh ?? HMD_DEFAULT_PUSH.pushTitleZh,
             pushBodyTemplateKo:
               c.pushBodyTemplateKo ?? HMD_DEFAULT_PUSH.pushBodyTemplateKo,
             pushBodyTemplateEn:
               c.pushBodyTemplateEn ?? HMD_DEFAULT_PUSH.pushBodyTemplateEn,
+            pushBodyTemplateJa:
+              c.pushBodyTemplateJa ?? HMD_DEFAULT_PUSH.pushBodyTemplateJa,
+            pushBodyTemplateZh:
+              c.pushBodyTemplateZh ?? HMD_DEFAULT_PUSH.pushBodyTemplateZh,
           });
         } else if (!cancelled) setHmdLoadError(true);
       } catch {
@@ -318,10 +340,16 @@ export default function DashboardPage() {
           minRootViewCount: c.minRootViewCount,
           pushTitleKo: c.pushTitleKo ?? HMD_DEFAULT_PUSH.pushTitleKo,
           pushTitleEn: c.pushTitleEn ?? HMD_DEFAULT_PUSH.pushTitleEn,
+          pushTitleJa: c.pushTitleJa ?? HMD_DEFAULT_PUSH.pushTitleJa,
+          pushTitleZh: c.pushTitleZh ?? HMD_DEFAULT_PUSH.pushTitleZh,
           pushBodyTemplateKo:
             c.pushBodyTemplateKo ?? HMD_DEFAULT_PUSH.pushBodyTemplateKo,
           pushBodyTemplateEn:
             c.pushBodyTemplateEn ?? HMD_DEFAULT_PUSH.pushBodyTemplateEn,
+          pushBodyTemplateJa:
+            c.pushBodyTemplateJa ?? HMD_DEFAULT_PUSH.pushBodyTemplateJa,
+          pushBodyTemplateZh:
+            c.pushBodyTemplateZh ?? HMD_DEFAULT_PUSH.pushBodyTemplateZh,
         });
       }
       alert("급등·급락 토론 푸시 설정을 저장했습니다.");
@@ -654,12 +682,16 @@ export default function DashboardPage() {
                       id="hmd-push-locale"
                       value={hmdPushLocale}
                       onChange={(e) =>
-                        setHmdPushLocale(e.target.value as "ko" | "en")
+                        setHmdPushLocale(
+                          e.target.value as "ko" | "en" | "ja" | "zh",
+                        )
                       }
                       className="rounded border border-zinc-300 px-2 py-1 text-sm text-zinc-800 bg-white focus:border-zinc-500 focus:outline-none"
                     >
                       <option value="ko">한국어</option>
                       <option value="en">English</option>
+                      <option value="ja">日本語</option>
+                      <option value="zh">简体中文</option>
                     </select>
                   </div>
                 </div>
@@ -671,8 +703,9 @@ export default function DashboardPage() {
                   <code className="rounded bg-white/70 px-1">
                     {"{direction}"}
                   </code>{" "}
-                  — KO: 급등 중·급락 중 / EN: surging·sliding. 제목·본문은 발송 시
-                  각각 약 65·180자에서 잘릴 수 있음.
+                  — KO: 급등 중·급락 중 / EN: surging·sliding / JA: 急騰中・急落中
+                  / ZH: 飙升中・下跌中. 제목·본문은 발송 시 각각 약 65·180자에서
+                  잘릴 수 있음.
                 </p>
                 {hmdPushLocale === "ko" ? (
                   <>
@@ -711,7 +744,7 @@ export default function DashboardPage() {
                       />
                     </div>
                   </>
-                ) : (
+                ) : hmdPushLocale === "en" ? (
                   <>
                     <div>
                       <label className="block text-xs text-zinc-600 mb-1">
@@ -741,6 +774,80 @@ export default function DashboardPage() {
                           setHmdConfig((c) =>
                             c
                               ? { ...c, pushBodyTemplateEn: e.target.value }
+                              : c,
+                          )
+                        }
+                        className="w-full rounded border border-zinc-300 px-2 py-1.5 text-sm font-normal"
+                      />
+                    </div>
+                  </>
+                ) : hmdPushLocale === "ja" ? (
+                  <>
+                    <div>
+                      <label className="block text-xs text-zinc-600 mb-1">
+                        タイトル
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={80}
+                        value={hmdConfig.pushTitleJa}
+                        onChange={(e) =>
+                          setHmdConfig((c) =>
+                            c ? { ...c, pushTitleJa: e.target.value } : c,
+                          )
+                        }
+                        className="w-full rounded border border-zinc-300 px-2 py-1.5 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-zinc-600 mb-1">
+                        本文
+                      </label>
+                      <textarea
+                        rows={3}
+                        maxLength={320}
+                        value={hmdConfig.pushBodyTemplateJa}
+                        onChange={(e) =>
+                          setHmdConfig((c) =>
+                            c
+                              ? { ...c, pushBodyTemplateJa: e.target.value }
+                              : c,
+                          )
+                        }
+                        className="w-full rounded border border-zinc-300 px-2 py-1.5 text-sm font-normal"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <label className="block text-xs text-zinc-600 mb-1">
+                        标题
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={80}
+                        value={hmdConfig.pushTitleZh}
+                        onChange={(e) =>
+                          setHmdConfig((c) =>
+                            c ? { ...c, pushTitleZh: e.target.value } : c,
+                          )
+                        }
+                        className="w-full rounded border border-zinc-300 px-2 py-1.5 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-zinc-600 mb-1">
+                        正文
+                      </label>
+                      <textarea
+                        rows={3}
+                        maxLength={320}
+                        value={hmdConfig.pushBodyTemplateZh}
+                        onChange={(e) =>
+                          setHmdConfig((c) =>
+                            c
+                              ? { ...c, pushBodyTemplateZh: e.target.value }
                               : c,
                           )
                         }
