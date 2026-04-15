@@ -44,7 +44,8 @@ function parseHistory(raw: unknown): HistoryEntry[] {
   return out;
 }
 
-const TOP_N = 10;
+const DEFAULT_TOP_N = 10;
+const MAX_TOP_N = 50;
 
 function normalizeInterestSymbol(category: string, symbol: string): string {
   const s = symbol.trim().toUpperCase();
@@ -89,6 +90,7 @@ async function applyInterestSurgeLocaleName(
 export async function fetchInterestSurgeFromDb(
   supabase: SupabaseClient,
   locale?: string,
+  limit: number = DEFAULT_TOP_N,
 ): Promise<{ snapshotDate: string; items: InterestSurgeItemDto[] }> {
   const { data: rows, error } = await supabase
     .from("dopamine_interest_asset_scores")
@@ -145,7 +147,8 @@ export async function fetchInterestSurgeFromDb(
 
   const candidates = [...byNormalized.values()];
   candidates.sort((a, b) => b.score - a.score);
-  const slice = candidates.slice(0, TOP_N);
+  const topN = Math.min(MAX_TOP_N, Math.max(1, Math.floor(limit)));
+  const slice = candidates.slice(0, topN);
   const localeBucket = resolveInterestSurgeLocale(locale);
   const localized = await applyInterestSurgeLocaleName(
     slice.map((item, i) => ({
