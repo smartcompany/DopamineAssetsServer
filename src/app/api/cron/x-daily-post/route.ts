@@ -1,6 +1,7 @@
 import { jsonWithCors } from "@/lib/cors";
 import { getFeedRankings } from "@/lib/feed-rankings-service";
 import { isCronAuthorizedRequest } from "@/lib/cron-secret-auth";
+import crypto from "node:crypto";
 
 const DEFAULT_X_API_BASE_URL = "https://api.twitter.com";
 const SHARE_URL = "https://dopamine-assets.vercel.app/?from=share";
@@ -67,15 +68,55 @@ async function buildDailyPostText(): Promise<string> {
 async function postToX(text: string): Promise<{ id: string | null; raw: unknown }> {
   const configuredBaseUrl = process.env.X_API_BASE_URL?.trim().replace(/\/+$/, "");
   const baseUrl = configuredBaseUrl || DEFAULT_X_API_BASE_URL;
-  const bearer = process.env.X_API_TOKEN?.trim();
-  if (!bearer) {
-    throw new Error("missing_x_api_token");
+  const consumerKey = process.env.X_API_KEY?.trim();
+  const consumerSecret = process.env.X_API_SECRET?.trim();
+  const accessToken = process.env.X_ACCESS_TOKEN?.trim();
+  const accessTokenSecret = process.env.X_ACCESS_TOKEN_SECRET?.trim();
+  if (!consumerKey || !consumerSecret || !accessToken || !accessTokenSecret) {
+    throw new Error("missing_x_oauth1_user_context_credentials");
   }
   console.log("[x-daily-post] postToX start", {
     baseUrl,
     textLength: text.length,
-    tokenPresent: true,
+    oauthMode: "oauth1_user_context",
   });
+
+  function enc(v: string): string {
+    return encodeURIComponent(v)
+      .replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+  }
+
+  function buildOAuth1Header(url: string, method: "POST"): string {
+    const oauth: Record<string, string> = {
+      oauth_consumer_key: consumerKey!,
+      oauth_token: accessToken!,
+      oauth_nonce: crypto.randomBytes(16).toString("hex"),
+      oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
+      oauth_signature_method: "HMAC-SHA1",
+      oauth_version: "1.0",
+    };
+
+    const paramEntries = Object.entries(oauth)
+      .map(([k, v]) => [enc(k), enc(v)] as const)
+      .sort(([ak, av], [bk, bv]) => {
+        if (ak === bk) return av.localeCompare(bv);
+        return ak.localeCompare(bk);
+      });
+    const normalizedParams = paramEntries.map(([k, v]) => `${k}=${v}`).join("&");
+    const baseString = `${method}&${enc(url)}&${enc(normalizedParams)}`;
+    const signingKey = `${enc(consumerSecret!)}&${enc(accessTokenSecret!)}`;
+    const signature = crypto
+      .createHmac("sha1", signingKey)
+      .update(baseString)
+      .digest("base64");
+    oauth.oauth_signature = signature;
+
+    const headerParams = Object.entries(oauth)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => `${enc(k)}="${enc(v)}"`)
+      .join(", ");
+    return `OAuth ${headerParams}`;
+  }
 
   async function attempt(base: string): Promise<{
     status: number;
@@ -83,11 +124,13 @@ async function postToX(text: string): Promise<{ id: string | null; raw: unknown 
     rawText: string;
     parsed: unknown;
   }> {
+    const url = `${base}/2/tweets`;
+    const authHeader = buildOAuth1Header(url, "POST");
     console.log("[x-daily-post] attempt", { base, endpoint: "/2/tweets" });
-    const res = await fetch(`${base}/2/tweets`, {
+    const res = await fetch(url, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${bearer}`,
+        Authorization: authHeader,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ text }),
