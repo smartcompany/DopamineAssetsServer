@@ -21,8 +21,15 @@ jobs:
             echo "Missing CRON_API_BASE_URL or CRON_SECRET"
             exit 1
           fi
-          RESPONSE=$(curl -sS -X POST "${CRON_API_BASE_URL}/api/cron/x-daily-post" \
+          BODY_FILE="$(mktemp)"
+          STATUS_CODE=$(curl -sS -o "$BODY_FILE" -w "%{http_code}" -X POST "${CRON_API_BASE_URL}/api/cron/x-daily-post" \
             -H "Authorization: Bearer ${CRON_SECRET}" \
-            -H "Content-Type: application/json" \
-            --fail)
-          echo "x-daily-post response: ${RESPONSE}"
+            -H "Content-Type: application/json")
+          echo "x-daily-post http_status: ${STATUS_CODE}"
+          echo "x-daily-post response_body:"
+          cat "$BODY_FILE"
+          echo
+          if [ "${STATUS_CODE}" -lt 200 ] || [ "${STATUS_CODE}" -ge 300 ]; then
+            echo "x-daily-post failed with status ${STATUS_CODE}"
+            exit 1
+          fi
