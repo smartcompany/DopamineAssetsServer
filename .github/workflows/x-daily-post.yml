@@ -1,0 +1,28 @@
+# X 일일 포스트 작업 (10:05 KST = 01:05 UTC)
+# - X 포스트: POST /api/cron/x-daily-post
+name: X daily post (10:05 KST)
+
+on:
+  schedule:
+    - cron: "5 1 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: X daily post
+        env:
+          CRON_API_BASE_URL: ${{ secrets.CRON_API_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_API_BASE_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "Missing CRON_API_BASE_URL or CRON_SECRET"
+            exit 1
+          fi
+          RESPONSE=$(curl -sS -X POST "${CRON_API_BASE_URL}/api/cron/x-daily-post" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            --fail)
+          echo "x-daily-post response: ${RESPONSE}"
