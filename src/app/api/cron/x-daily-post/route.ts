@@ -3,8 +3,25 @@ import { getFeedRankings } from "@/lib/feed-rankings-service";
 import { isCronAuthorizedRequest } from "@/lib/cron-secret-auth";
 import crypto from "node:crypto";
 
-const DEFAULT_X_API_BASE_URL = "https://api.twitter.com";
+// X Tweets(생성) API URL. env `X_API_POST_URL`에 반드시 지정되어 있어야 한다.
+// 404가 나면 `api.x.com` <-> `api.twitter.com` 호스트만 스왑해 한 번 더 시도한다(리브랜딩 시기 보정).
+// 검색용 `X_API_BASE_URL`(다른 env)와는 별개.
 const SHARE_URL = "https://dopamine-assets.vercel.app/?from=share";
+
+function buildPostUrlCandidates(): string[] {
+  const primary = process.env.X_API_POST_URL?.trim().replace(/\/+$/, "");
+  if (!primary) {
+    throw new Error("missing_x_api_post_url");
+  }
+  const candidates = [primary];
+  // 호스트 스왑 폴백 URL 한 개 추가.
+  if (primary.includes("api.x.com")) {
+    candidates.push(primary.replace("api.x.com", "api.twitter.com"));
+  } else if (primary.includes("api.twitter.com")) {
+    candidates.push(primary.replace("api.twitter.com", "api.x.com"));
+  }
+  return candidates;
+}
 
 function pct(v: number): string {
   if (!Number.isFinite(v)) return "0.00%";
@@ -66,8 +83,6 @@ async function buildDailyPostText(): Promise<string> {
 }
 
 async function postToX(text: string): Promise<{ id: string | null; raw: unknown }> {
-  const configuredBaseUrl = process.env.X_API_BASE_URL?.trim().replace(/\/+$/, "");
-  const baseUrl = configuredBaseUrl || DEFAULT_X_API_BASE_URL;
   const consumerKey = process.env.X_API_KEY?.trim();
   const consumerSecret = process.env.X_API_SECRET?.trim();
   const accessToken = process.env.X_ACCESS_TOKEN?.trim();
@@ -75,8 +90,9 @@ async function postToX(text: string): Promise<{ id: string | null; raw: unknown 
   if (!consumerKey || !consumerSecret || !accessToken || !accessTokenSecret) {
     throw new Error("missing_x_oauth1_user_context_credentials");
   }
+  const postUrlCandidates = buildPostUrlCandidates();
   console.log("[x-daily-post] postToX start", {
-    baseUrl,
+    postUrlCandidates,
     textLength: text.length,
     oauthMode: "oauth1_user_context",
   });
@@ -118,15 +134,14 @@ async function postToX(text: string): Promise<{ id: string | null; raw: unknown 
     return `OAuth ${headerParams}`;
   }
 
-  async function attempt(base: string): Promise<{
+  async function attempt(url: string): Promise<{
     status: number;
     ok: boolean;
     rawText: string;
     parsed: unknown;
   }> {
-    const url = `${base}/2/tweets`;
     const authHeader = buildOAuth1Header(url, "POST");
-    console.log("[x-daily-post] attempt", { base, endpoint: "/2/tweets" });
+    console.log("[x-daily-post] attempt", { url });
     const res = await fetch(url, {
       method: "POST",
       headers: {
@@ -143,7 +158,7 @@ async function postToX(text: string): Promise<{ id: string | null; raw: unknown 
       // keep raw text
     }
     console.log("[x-daily-post] attempt result", {
-      base,
+      url,
       status: res.status,
       ok: res.ok,
       responsePreview: String(rawText).slice(0, 240),
@@ -151,23 +166,18 @@ async function postToX(text: string): Promise<{ id: string | null; raw: unknown 
     return { status: res.status, ok: res.ok, rawText, parsed };
   }
 
-  let usedBase = baseUrl;
-  let result = await attempt(usedBase);
-
-  // 일부 계정/설정에서 api.x.com 경로가 404일 수 있어 twitter 호스트로 폴백.
-  if (
-    result.status === 404 &&
-    usedBase.includes("api.x.com") &&
-    !usedBase.includes("api.twitter.com")
-  ) {
-    usedBase = "https://api.twitter.com";
-    result = await attempt(usedBase);
+  // 1차 URL 실패(404)만 폴백 URL로 재시도. 그 외 에러는 즉시 중단.
+  let result: Awaited<ReturnType<typeof attempt>> | null = null;
+  for (const url of postUrlCandidates) {
+    result = await attempt(url);
+    if (result.ok) break;
+    if (result.status !== 404) break;
   }
 
-  if (!result.ok) {
-    throw new Error(
-      `x_post_failed_${result.status}:${String(result.rawText).slice(0, 500)}`,
-    );
+  if (!result || !result.ok) {
+    const status = result?.status ?? 0;
+    const raw = result?.rawText ?? "";
+    throw new Error(`x_post_failed_${status}:${String(raw).slice(0, 500)}`);
   }
 
   const obj = result.parsed as { data?: { id?: string } } | null;
