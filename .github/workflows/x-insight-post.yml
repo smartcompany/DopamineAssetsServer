@@ -1,21 +1,21 @@
-# X 랭킹 템플릿 포스트 — 12시간 간격 하루 2회
-# - 엔드포인트: POST /api/cron/x-daily-post
-# - 실행 시각(UTC / KST): 01:05 / 10:05, 13:05 / 22:05
-# - 30종 템플릿을 12h 슬롯 순번으로 한 바퀴 (총 15일 주기)
-name: X daily post (every 12h)
+# X AI 인사이트 포스트 — 하루 1회
+# - 엔드포인트: POST /api/cron/x-insight-post
+# - 실행 시각(UTC / KST): 05:05 / 14:05 (템플릿 포스트 사이 슬롯)
+# - 소스: coinpang.org 최근 게시글 → OpenAI 축약 → 글 permalink 첨부
+name: X insight post (daily)
 
 on:
   workflow_dispatch: {}
   schedule:
-    # 12시간 간격 (01:05, 13:05 UTC → KST 10:05, 22:05)
-    - cron: "5 1,13 * * *"
+    # 하루 1회 (05:05 UTC → KST 14:05)
+    - cron: "5 5 * * *"
 
 jobs:
   post:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - name: X daily post
+      - name: X insight post
         env:
           CRON_API_BASE_URL: ${{ secrets.CRON_API_BASE_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
@@ -25,14 +25,14 @@ jobs:
             exit 1
           fi
           BODY_FILE="$(mktemp)"
-          STATUS_CODE=$(curl -sS -o "$BODY_FILE" -w "%{http_code}" -X POST "${CRON_API_BASE_URL}/api/cron/x-daily-post" \
+          STATUS_CODE=$(curl -sS -o "$BODY_FILE" -w "%{http_code}" -X POST "${CRON_API_BASE_URL}/api/cron/x-insight-post" \
             -H "Authorization: Bearer ${CRON_SECRET}" \
             -H "Content-Type: application/json")
-          echo "x-daily-post http_status: ${STATUS_CODE}"
-          echo "x-daily-post response_body:"
+          echo "x-insight-post http_status: ${STATUS_CODE}"
+          echo "x-insight-post response_body:"
           cat "$BODY_FILE"
           echo
           if [ "${STATUS_CODE}" -lt 200 ] || [ "${STATUS_CODE}" -ge 300 ]; then
-            echo "x-daily-post failed with status ${STATUS_CODE}"
+            echo "x-insight-post failed with status ${STATUS_CODE}"
             exit 1
           fi
