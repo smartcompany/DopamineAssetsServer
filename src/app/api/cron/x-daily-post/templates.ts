@@ -24,12 +24,12 @@ const TEMPLATES = {
   ranking: {
     text: `🤯 오늘의 수익률 TOP3
 
-🚀 급등
+🚀
 {{U1_ROW}}
 {{U2_ROW}}
 {{U3_ROW}}
 
-💀 급락
+💀
 {{D1_ROW}}
 {{D2_ROW}}
 {{D3_ROW}}
@@ -161,6 +161,253 @@ const TEMPLATES = {
 {{URL}}`,
     // 해골 댄스("Dance of Death"). 계좌 녹음 + 💀 톤 매칭.
     gif: "https://media.giphy.com/media/xyFpHGNvnwEphb0jlF/giphy-downsized.gif",
+  },
+
+  // 11) 자랑 유도 — "이거 미리 탄 사람 자랑좀"
+  bragger: {
+    text: `🏆 오늘의 주식 왕좌
+
+{{U1_NAME_18}} ({{U1_SYM}})
+하루 만에 {{U1_PCT}} 쓸어감 👑
+
+이거 미리 탄 사람, 한 번만 자랑좀 🙏
+{{URL}}`,
+    gif: "https://media.giphy.com/media/3o6MbeDiaHJaF2EuQM/giphy-downsized.gif",
+  },
+
+  // 12) 경고 — 하락 종목 조심
+  warning: {
+    text: `⚠️ [경고] 이 종목들 조심해
+
+❌ {{D1_SYM}} {{D1_PCT}}
+❌ {{D2_SYM}} {{D2_PCT}}
+❌ {{D3_SYM}} {{D3_PCT}}
+
+오늘 피하라는 신호임 🚫
+{{URL}}`,
+    gif: "https://media.giphy.com/media/h0xTsaoIUOZGT2GuFl/giphy.gif",
+  },
+
+  // 13) 축하 파티 — confetti
+  celebration: {
+    text: `🎉 오늘의 파티 주인공
+
+🥂 {{U1_SYM}} {{U1_PCT}}
+🥂 {{U2_SYM}} {{U2_PCT}}
+🥂 {{U3_SYM}} {{U3_PCT}}
+
+증시 축하 파티 열림 🍾
+{{URL}}`,
+    gif: "https://media.giphy.com/media/KyIb22PC9GGdomKGUG/giphy-downsized.gif",
+  },
+
+  // 14) 탐정 — Sherlock 톤
+  detective: {
+    text: `🔍 오늘 "{{U1_NAME_18}}" 수사 의뢰
+
+단서: 하루 만에 {{U1_PCT}}
+용의자: 누가 밀어올렸나? 🕵️
+
+진실은... 여기서 👇
+{{URL}}`,
+    gif: "https://media.giphy.com/media/kbUXGJHxS80O1GJwEx/giphy.gif",
+  },
+
+  // 15) 일기 — 한 줄 요약
+  diary: {
+    text: `💭 오늘 증시 한 줄 요약
+
+"미친 {{U1_SYM}}, 죽은 {{D1_SYM}}."
+그 이상도 이하도 아님 🫠
+
+전체 순위 보기 👇
+{{URL}}`,
+    gif: "https://media.giphy.com/media/WwK9nYJ2VuhP3iUoWZ/giphy.gif",
+  },
+
+  // 16) 카지노/잭팟
+  casino: {
+    text: `🎰 오늘의 잭팟 종목
+
+🎲 {{U1_SYM}} {{U1_PCT}}
+🎲 {{U2_SYM}} {{U2_PCT}}
+🎲 {{U3_SYM}} {{U3_PCT}}
+
+주식이냐 슬롯머신이냐 🤑
+{{URL}}`,
+    gif: "https://media.giphy.com/media/idG0ptkLQWvECYb6fW/giphy-downsized.gif",
+  },
+
+  // 17) 조롱 — 손절 유발자
+  roast: {
+    text: `🤡 오늘의 손절 유발자
+
+{{D1_NAME_18}} ({{D1_SYM}})
+{{D1_PCT}}... 어디까지 빠져?
+
+존버러들 다 어디 갔냐 👻
+{{URL}}`,
+    gif: "https://media.giphy.com/media/l1J9qOI6osntSEL04/giphy-downsized.gif",
+  },
+
+  // 18) 운세/점괘
+  horoscope: {
+    text: `🔮 오늘의 증시 운세
+
+📈 상승운: {{U1_SYM}} · {{U2_SYM}}
+📉 하락운: {{D1_SYM}} · {{D2_SYM}}
+
+내일 뭐 살까? 🤔
+{{URL}}`,
+    gif: "https://media.giphy.com/media/98CXZ9LMBLlzsE4jIS/giphy.gif",
+  },
+
+  // 19) 대결 — 1위 vs 1위 KO
+  battle: {
+    text: `⚔️ 오늘의 증시 매치업
+
+🔵 {{U1_SYM}} {{U1_PCT}}
+🔴 {{D1_SYM}} {{D1_PCT}}
+
+승자 {{U1_SYM}}. KO 승 🥊
+{{URL}}`,
+    gif: "https://media.giphy.com/media/0imDX3iIkgbEHbgVWz/giphy.gif",
+  },
+
+  // 20) 상폐빔 meme
+  crying_meme: {
+    text: `😭 상폐빔 맞은 느낌
+
+"{{D1_NAME_18}}" ({{D1_SYM}})
+{{D1_PCT}} 처참함 💣
+
+청약자 명복을 빕니다 🙏
+{{URL}}`,
+    gif: "https://media.giphy.com/media/94GrXnEGRffGU2CcfP/giphy.gif",
+  },
+
+  // 21) 충격 편차 표시
+  shock_meter: {
+    text: `📊 오늘의 수익률 편차
+
+📈 최고: {{U1_SYM}} {{U1_PCT}}
+📉 최저: {{D1_SYM}} {{D1_PCT}}
+
+이 차이 실화임? 🤯
+{{URL}}`,
+    gif: "https://media.giphy.com/media/s4W4zMzyV6oIo/giphy-downsized.gif",
+  },
+
+  // 22) 비상 — 매도벽
+  emergency: {
+    text: `🆘 [비상] 매도벽 뚫림
+
+"{{D1_NAME_18}}" ({{D1_SYM}}) {{D1_PCT}}
+지지선 붕괴... 🫠
+
+다른 급락 종목 👇
+{{URL}}`,
+    gif: "https://media.giphy.com/media/YO7P8VC7nlQlO/giphy-downsized.gif",
+  },
+
+  // 23) 역주행 comeback
+  comeback: {
+    text: `💪 오늘의 역주행 스타
+
+{{U1_SYM}} {{U1_PCT}} 🔥
+{{U2_SYM}} {{U2_PCT}} 🔥
+{{U3_SYM}} {{U3_PCT}} 🔥
+
+증시가 불타고 있음 🚀
+{{URL}}`,
+    gif: "https://media.giphy.com/media/qxuK0ct226KJdgh1ZU/giphy.gif",
+  },
+
+  // 24) MVP/명예의 전당
+  hall_of_fame: {
+    text: `🏆 오늘의 MVP 종목
+
+{{U1_NAME_18}} ({{U1_SYM}})
+{{U1_PCT}} 🎯
+
+명예의 전당 입성 👑
+{{URL}}`,
+    gif: "https://media.giphy.com/media/a70gdGBpnj7YEddYre/giphy-downsized.gif",
+  },
+
+  // 25) 가십 — 소문 형식
+  gossip: {
+    text: `👀 오늘 떠도는 소문
+
+"{{U1_SYM}} {{U1_PCT}}?? 뭐 터졌음?"
+"{{D1_SYM}}는 왜 또 망함?"
+
+팩트 체크 가자 👇
+{{URL}}`,
+    gif: "https://media.giphy.com/media/UVpYKeRaZ7SyboUUoJ/giphy-downsized.gif",
+  },
+
+  // 26) 로봇 자동 리포트
+  robot: {
+    text: `🤖 [AUTO REPORT]
+
+> 급등 1위: {{U1_SYM}} [{{U1_PCT}}]
+> 급락 1위: {{D1_SYM}} [{{D1_PCT}}]
+> VOLATILITY: HIGH
+
+FULL DATA 👇
+{{URL}}`,
+    gif: "https://media.giphy.com/media/ylvhS8cpKWBqiv7Ply/giphy-downsized.gif",
+  },
+
+  // 27) 종말의 전조
+  apocalypse: {
+    text: `☠️ 시장 종말의 전조
+
+{{D1_SYM}} {{D1_PCT}}
+{{D2_SYM}} {{D2_PCT}}
+{{D3_SYM}} {{D3_PCT}}
+
+모두 한 방향... 수상함 🫥
+{{URL}}`,
+    gif: "https://media.giphy.com/media/jZqTlkgJ9F4H0isjef/giphy-downsized.gif",
+  },
+
+  // 28) 달까지
+  to_the_moon: {
+    text: `🌕 달까지 날아간 종목
+
+"{{U1_NAME_18}}" {{U1_PCT}}
+
+지구와 이별 완료 👋🚀
+다음 정거장은 화성? 🔴
+{{URL}}`,
+    gif: "https://media.giphy.com/media/uKkud3HmUZlPW/giphy-downsized.gif",
+  },
+
+  // 29) 고백 타임
+  confession: {
+    text: `🤫 오늘의 고백 타임
+
+"어제 {{D1_SYM}} 샀는데 {{D1_PCT}} 🫠"
+"{{U1_SYM}} 왜 안 샀지... {{U1_PCT}}"
+
+너는 오늘 어땠음?
+{{URL}}`,
+    gif: "https://media.giphy.com/media/mTtDdazMpaFi0/giphy-downsized.gif",
+  },
+
+  // 30) 하이프
+  hype: {
+    text: `🔥🔥🔥 오늘 핫한 종목들
+
+{{U1_SYM}} {{U1_PCT}}
+{{U2_SYM}} {{U2_PCT}}
+{{U3_SYM}} {{U3_PCT}}
+
+전부 불타는 중 ♨️
+{{URL}}`,
+    gif: "https://media.giphy.com/media/MXcqj6jOhr4R99iFZv/giphy-downsized.gif",
   },
 } as const satisfies Record<string, DailyPostTemplate>;
 

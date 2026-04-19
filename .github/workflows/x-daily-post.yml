@@ -1,12 +1,13 @@
-# X 일일 포스트 작업 (10:05 KST = 01:05 UTC)
+# X 포스트 작업 — 8시간 간격 하루 3회
 # - X 포스트: POST /api/cron/x-daily-post
-name: X daily post (10:05 KST)
+# - 실행 시각(UTC / KST): 01:05 / 10:05, 09:05 / 18:05, 17:05 / 02:05(+1d)
+name: X post (every 8h)
 
 on:
   workflow_dispatch: {}
   schedule:
-    # 매일 01:05 UTC = 10:05 KST 에 1회 실행
-    - cron: "5 1 * * *"
+    # 8시간 간격 (01:05, 09:05, 17:05 UTC)
+    - cron: "5 1,9,17 * * *"
 
 jobs:
   post:

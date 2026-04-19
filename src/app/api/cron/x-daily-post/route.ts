@@ -3,6 +3,12 @@ import { getFeedRankings } from "@/lib/feed-rankings-service";
 import { isCronAuthorizedRequest } from "@/lib/cron-secret-auth";
 import crypto from "node:crypto";
 import TEMPLATES from "./templates";
+import { buildInsightPost, type InsightPost } from "@/lib/market-insight/build-insight-post";
+
+// 하루 3회 X 포스트 중 30% 확률로 "장전 인사이트" 모드로 전환.
+// 신뢰성 레이어(시장 뉴스 요약)와 재미 레이어(랭킹 템플릿)를 섞어 계정 톤을 다양하게.
+// 환경변수 `X_INSIGHT_PROBABILITY`로 덮어쓰기 가능 (0~1, 기본 0.3).
+const DEFAULT_INSIGHT_PROBABILITY = 0.3;
 
 // X Tweets(생성) API URL. env `X_API_POST_URL`에 반드시 지정되어 있어야 한다.
 // 404가 나면 `api.x.com` <-> `api.twitter.com` 호스트만 스왑해 한 번 더 시도한다(리브랜딩 시기 보정).
@@ -87,8 +93,9 @@ function truncateForTweet(text: string, max = 280): string {
 
 type RankItem = { name: string; symbol: string; priceChangePct: number };
 
-// 10종 템플릿 ID. 일자별로 회전하는 순서대로 나열.
+// 30종 템플릿 ID. 8시간 슬롯마다 회전하는 순서대로 나열.
 // 실제 본문은 templates.ts에 동일한 키로 등록되어 있어야 한다.
+// 하루 3포스트(08h 간격) × 10일 = 30슬롯 → 전체 한 바퀴.
 const TEMPLATE_IDS = [
   "ranking",
   "spotlight_up",
@@ -100,6 +107,26 @@ const TEMPLATE_IDS = [
   "question",
   "top3_up_only",
   "top3_down_only",
+  "bragger",
+  "warning",
+  "celebration",
+  "detective",
+  "diary",
+  "casino",
+  "roast",
+  "horoscope",
+  "battle",
+  "crying_meme",
+  "shock_meter",
+  "emergency",
+  "comeback",
+  "hall_of_fame",
+  "gossip",
+  "robot",
+  "apocalypse",
+  "to_the_moon",
+  "confession",
+  "hype",
 ] as const;
 type TemplateId = (typeof TEMPLATE_IDS)[number];
 
@@ -150,19 +177,59 @@ function renderTemplate(id: TemplateId, u: RankItem[], d: RankItem[]): string {
     .replace(/\s+$/u, "");
 }
 
+// 8시간 슬롯 기준 템플릿 선택. 하루 3포스트(08h 간격) × 10일 = 30슬롯으로 한 바퀴.
+// (예: 2026-04-17 UTC 01:05 슬롯 N, 2026-04-17 UTC 09:05 슬롯 N+1, ...)
 function pickTemplateId(dateMs: number): TemplateId {
-  const dayIndex = Math.floor(dateMs / 86_400_000);
-  const idx = ((dayIndex % TEMPLATE_IDS.length) + TEMPLATE_IDS.length) % TEMPLATE_IDS.length;
+  const slotMs = 8 * 60 * 60 * 1000;
+  const slotIndex = Math.floor(dateMs / slotMs);
+  const idx = ((slotIndex % TEMPLATE_IDS.length) + TEMPLATE_IDS.length) % TEMPLATE_IDS.length;
   return TEMPLATE_IDS[idx];
 }
 
+type DailyPostMode = "template" | "insight";
+
 type DailyPostPayload = {
+  mode: DailyPostMode;
   text: string;
-  templateId: TemplateId;
+  /** mode="template"일 때만 채워진다. insight 모드에서는 "insight" 고정 라벨. */
+  templateId: TemplateId | "insight";
   gifUrl?: string;
+  /** insight 모드에서 원문 기사 링크 (로그/응답 디버깅용) */
+  sourceUrl?: string;
+  sourceTitle?: string;
+  sourceName?: string;
 };
 
-async function buildDailyPost(): Promise<DailyPostPayload> {
+function insightProbability(): number {
+  const raw = process.env.X_INSIGHT_PROBABILITY?.trim();
+  if (!raw) return DEFAULT_INSIGHT_PROBABILITY;
+  const n = Number.parseFloat(raw);
+  if (!Number.isFinite(n)) return DEFAULT_INSIGHT_PROBABILITY;
+  return Math.min(1, Math.max(0, n));
+}
+
+function shouldUseInsightMode(): boolean {
+  const p = insightProbability();
+  if (p <= 0) return false;
+  if (p >= 1) return true;
+  // 매 실행마다 독립적으로 Math.random() 판정 → 예측 불가, 장기적으로 p에 수렴.
+  return Math.random() < p;
+}
+
+function insightPostToPayload(post: InsightPost): DailyPostPayload {
+  const text = truncateForTweet(post.text);
+  return {
+    mode: "insight",
+    text,
+    templateId: "insight",
+    gifUrl: undefined,
+    sourceUrl: post.sourceUrl,
+    sourceTitle: post.sourceTitle,
+    sourceName: post.sourceName,
+  };
+}
+
+async function buildTemplatePost(): Promise<DailyPostPayload> {
   const rankingParams = new URLSearchParams({
     limit: "50",
     source: "yahoo_us",
@@ -190,7 +257,38 @@ async function buildDailyPost(): Promise<DailyPostPayload> {
   const text = truncateForTweet(raw);
   const gifUrlRaw = (TEMPLATES as Record<TemplateId, { gif?: string }>)[templateId].gif ?? "";
   const gifUrl = gifUrlRaw.trim() ? gifUrlRaw.trim() : undefined;
-  return { text, templateId, gifUrl };
+  return { mode: "template", text, templateId, gifUrl };
+}
+
+/**
+ * 인사이트 모드 우선 시도 → 실패 시 템플릿 모드로 fallback.
+ * 환경변수 `X_INSIGHT_PROBABILITY`(0~1)로 스위칭 확률 제어.
+ */
+async function buildDailyPost(): Promise<DailyPostPayload> {
+  const useInsight = shouldUseInsightMode();
+  console.log("[x-daily-post] mode roll", {
+    probability: insightProbability(),
+    useInsight,
+  });
+  if (useInsight) {
+    try {
+      const insight = await buildInsightPost();
+      if (insight) {
+        console.log("[x-daily-post] insight built", {
+          sourceName: insight.sourceName,
+          sourceTitle: insight.sourceTitle.slice(0, 80),
+          textLen: insight.text.length,
+        });
+        return insightPostToPayload(insight);
+      }
+      console.warn("[x-daily-post] insight builder returned null, fallback to template");
+    } catch (e) {
+      console.warn("[x-daily-post] insight build failed, fallback to template", {
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+  return buildTemplatePost();
 }
 
 function fingerprintEnv(
@@ -555,7 +653,8 @@ export async function POST(request: Request) {
       at: new Date().toISOString(),
     });
     const creds = loadXCreds();
-    const { text, templateId, gifUrl } = await buildDailyPost();
+    const payload = await buildDailyPost();
+    const { mode, text, templateId, gifUrl, sourceUrl, sourceTitle, sourceName } = payload;
 
     // GIF 업로드는 실패해도 텍스트 포스트는 살려둔다(fail-soft).
     let mediaId: string | null = null;
@@ -573,12 +672,16 @@ export async function POST(request: Request) {
     return jsonWithCors({
       ok: true,
       posted: true,
+      mode,
       templateId,
       text,
       tweetId: posted.id,
       mediaId,
       gifUrl: gifUrl ?? null,
       gifError,
+      sourceUrl: sourceUrl ?? null,
+      sourceTitle: sourceTitle ?? null,
+      sourceName: sourceName ?? null,
       at: new Date().toISOString(),
     });
   } catch (e) {
