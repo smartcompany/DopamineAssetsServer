@@ -82,12 +82,27 @@ async function buildDailyPostText(): Promise<string> {
   return truncateForTweet(body);
 }
 
+function fingerprintEnv(name: string): { name: string; len: number; tail: string } | { name: string; missing: true } {
+  const v = process.env[name];
+  if (v == null) return { name, missing: true };
+  // 값 자체는 노출하지 않고 길이 + 끝 4글자 "지문"만 로그로 남긴다.
+  return { name, len: v.length, tail: v.length >= 4 ? v.slice(-4) : v };
+}
+
 async function postToX(text: string): Promise<{ id: string | null; raw: unknown }> {
   const consumerKey = process.env.X_API_KEY?.trim();
   const consumerSecret = process.env.X_API_SECRET?.trim();
   const accessToken = process.env.X_ACCESS_TOKEN?.trim();
   const accessTokenSecret = process.env.X_ACCESS_TOKEN_SECRET?.trim();
   if (!consumerKey || !consumerSecret || !accessToken || !accessTokenSecret) {
+    console.error("[x-daily-post] missing creds", {
+      fingerprints: [
+        fingerprintEnv("X_API_KEY"),
+        fingerprintEnv("X_API_SECRET"),
+        fingerprintEnv("X_ACCESS_TOKEN"),
+        fingerprintEnv("X_ACCESS_TOKEN_SECRET"),
+      ],
+    });
     throw new Error("missing_x_oauth1_user_context_credentials");
   }
   const postUrlCandidates = buildPostUrlCandidates();
@@ -95,6 +110,12 @@ async function postToX(text: string): Promise<{ id: string | null; raw: unknown 
     postUrlCandidates,
     textLength: text.length,
     oauthMode: "oauth1_user_context",
+    credFingerprints: [
+      fingerprintEnv("X_API_KEY"),
+      fingerprintEnv("X_API_SECRET"),
+      fingerprintEnv("X_ACCESS_TOKEN"),
+      fingerprintEnv("X_ACCESS_TOKEN_SECRET"),
+    ],
   });
 
   function enc(v: string): string {
