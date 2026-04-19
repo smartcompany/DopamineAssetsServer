@@ -4,6 +4,9 @@ name: X daily post (10:05 KST)
 
 on:
   workflow_dispatch: {}
+  schedule:
+    # 매일 01:05 UTC = 10:05 KST 에 1회 실행
+    - cron: "5 1 * * *"
 
 jobs:
   post:
