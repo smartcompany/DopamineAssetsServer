@@ -198,6 +198,8 @@ type DailyPostPayload = {
   sourceUrl?: string;
   sourceTitle?: string;
   sourceName?: string;
+  /** insight 모드에서 선택된 coinpang posts.id */
+  sourcePostId?: number;
 };
 
 function insightProbability(): number {
@@ -226,6 +228,7 @@ function insightPostToPayload(post: InsightPost): DailyPostPayload {
     sourceUrl: post.sourceUrl,
     sourceTitle: post.sourceTitle,
     sourceName: post.sourceName,
+    sourcePostId: post.sourcePostId,
   };
 }
 
@@ -654,7 +657,8 @@ export async function POST(request: Request) {
     });
     const creds = loadXCreds();
     const payload = await buildDailyPost();
-    const { mode, text, templateId, gifUrl, sourceUrl, sourceTitle, sourceName } = payload;
+    const { mode, text, templateId, gifUrl, sourceUrl, sourceTitle, sourceName, sourcePostId } =
+      payload;
 
     // GIF 업로드는 실패해도 텍스트 포스트는 살려둔다(fail-soft).
     let mediaId: string | null = null;
@@ -682,6 +686,7 @@ export async function POST(request: Request) {
       sourceUrl: sourceUrl ?? null,
       sourceTitle: sourceTitle ?? null,
       sourceName: sourceName ?? null,
+      sourcePostId: sourcePostId ?? null,
       at: new Date().toISOString(),
     });
   } catch (e) {
