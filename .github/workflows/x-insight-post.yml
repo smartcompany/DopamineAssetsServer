@@ -6,9 +6,10 @@ name: X insight post (daily)
 
 on:
   workflow_dispatch: {}
-  schedule:
-    # 하루 1회 (05:05 UTC → KST 14:05)
-    - cron: "5 5 * * *"
+  # 계정 정지 대응: 자동 스케줄 중단
+  # schedule:
+  #   # 하루 1회 (05:05 UTC → KST 14:05)
+  #   - cron: "5 5 * * *"
 
 jobs:
   post:

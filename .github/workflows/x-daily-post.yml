@@ -6,9 +6,10 @@ name: X daily post (every 12h)
 
 on:
   workflow_dispatch: {}
-  schedule:
-    # 12시간 간격 (01:05, 13:05 UTC → KST 10:05, 22:05)
-    - cron: "5 1,13 * * *"
+  # 계정 정지 대응: 자동 스케줄 중단
+  # schedule:
+  #   # 12시간 간격 (01:05, 13:05 UTC → KST 10:05, 22:05)
+  #   - cron: "5 1,13 * * *"
 
 jobs:
   post:
