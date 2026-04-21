@@ -1,6 +1,12 @@
 import Link from "next/link";
 
-export default function Home() {
+export const metadata = {
+  title: "Dopamine Assets API (Dev)",
+  description: "Internal API overview for Dopamine Assets Flutter client.",
+  robots: { index: false, follow: false },
+};
+
+export default function DevHome() {
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 p-10 font-sans">
       <h1 className="text-2xl font-semibold tracking-tight">
@@ -35,10 +41,7 @@ export default function Home() {
           </Link>
         </li>
         <li>
-          <Link
-            className="underline"
-            href="/api/themes?kind=hot"
-          >
+          <Link className="underline" href="/api/themes?kind=hot">
             GET /api/themes?kind=hot|crashed|emerging (optional locale=ko|en)
           </Link>
         </li>
