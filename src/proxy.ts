@@ -10,6 +10,10 @@ function pickStore(uaLower: string): string {
   return uaLower.includes("android") ? PLAY_STORE : IOS_APP_STORE;
 }
 
+/**
+ * `/applink` — UA 기준 스토어 302 (기존 동작; 사파리/QR 등).
+ * X 인앱 등은 ` /applink/social` (HTML itms-apps / market) 사용.
+ */
 export function proxy(request: NextRequest) {
   const url = new URL(request.url);
   if (url.pathname === "/applink") {

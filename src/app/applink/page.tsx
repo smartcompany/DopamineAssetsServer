@@ -8,8 +8,10 @@ export const metadata = {
 };
 
 /**
- * 기본 동작은 proxy.ts에서 /applink -> 스토어 302 리다이렉트.
- * 이 페이지는 프록시 미적용 환경에서의 iOS 폴백.
+ * proxy.ts 가 /applink → App Store/Play 302(UA 분기)를 담당.
+ * 프록시가 적용되지 않는 환경에서의 iOS 기본 폴백.
+ *
+ * X·인앱 WebView 는 ` /applink/social` 를 사용.
  */
 export default function AppLinkFallbackPage() {
   redirect(IOS_APP_STORE);
