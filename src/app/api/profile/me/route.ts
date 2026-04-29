@@ -199,6 +199,22 @@ export async function DELETE(request: Request) {
       );
     }
 
+    // 2c) 배지 상태
+    const { error: badgeErr } = await supabase
+      .from("dopamine_user_badges")
+      .delete()
+      .eq("uid", uid);
+    if (badgeErr && !isMissingTableError(badgeErr)) {
+      console.error(badgeErr);
+      return jsonWithCors(
+        { error: "supabase_error", detail: badgeErr.message },
+        { status: 500 },
+      );
+    }
+    if (isMissingTableError(badgeErr)) {
+      console.warn("[profile/me][DELETE] dopamine_user_badges missing; skip");
+    }
+
     // 3) 팔로우/차단 관계 정리 (양방향)
     const [f1, f2, b1, b2] = await Promise.all([
       supabase
