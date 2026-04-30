@@ -5,6 +5,7 @@ import { isDisplayNameTakenByOther } from "@/lib/profile-display-name";
 import { checkBannedWords } from "@/lib/validate-banned-words";
 
 const MAX_NAME = 80;
+const MAX_BIO = 400;
 
 function isMissingTableError(error: { code?: string } | null | undefined) {
   return error?.code === "42P01";
@@ -29,12 +30,22 @@ export async function PATCH(request: Request) {
   const o = body as Record<string, unknown>;
   const hasDisplayName = typeof o.displayName === "string";
   const hasPhotoUrl = Object.prototype.hasOwnProperty.call(o, "photoUrl");
+  const hasBio = Object.prototype.hasOwnProperty.call(o, "bio");
   const rawName = hasDisplayName ? (o.displayName as string).trim() : "";
   const rawPhoto =
     hasPhotoUrl && typeof o.photoUrl === "string" ? o.photoUrl.trim() : null;
   const photoUrl =
     rawPhoto != null && rawPhoto.length > 0 ? rawPhoto.slice(0, 2048) : null;
-  if (!hasDisplayName && !hasPhotoUrl) {
+  if (hasBio && typeof o.bio !== "string") {
+    return jsonWithCors({ error: "invalid_bio" }, { status: 400 });
+  }
+  const rawBio = hasBio ? (o.bio as string).trim() : "";
+  const bioValue: string | null | undefined = !hasBio
+    ? undefined
+    : rawBio.length > 0
+      ? rawBio
+      : null;
+  if (!hasDisplayName && !hasPhotoUrl && !hasBio) {
     return jsonWithCors({ error: "nothing_to_update" }, { status: 400 });
   }
   if (hasDisplayName && (rawName.length < 1 || rawName.length > MAX_NAME)) {
@@ -42,6 +53,25 @@ export async function PATCH(request: Request) {
       { error: "invalid_display_name", max: MAX_NAME },
       { status: 400 },
     );
+  }
+  if (hasBio && rawBio.length > MAX_BIO) {
+    return jsonWithCors(
+      { error: "invalid_bio", max: MAX_BIO },
+      { status: 400 },
+    );
+  }
+  if (hasBio && rawBio.length > 0) {
+    const bannedBio = checkBannedWords(rawBio);
+    if (bannedBio) {
+      return jsonWithCors(
+        {
+          error: "banned_words",
+          field: "bio",
+          message: `허용되지 않는 표현이 포함되어 있습니다: ${bannedBio}`,
+        },
+        { status: 400 },
+      );
+    }
   }
   if (hasDisplayName) {
     const banned = checkBannedWords(rawName);
@@ -71,6 +101,7 @@ export async function PATCH(request: Request) {
         uid,
         ...(hasDisplayName ? { display_name: rawName } : {}),
         ...(hasPhotoUrl ? { photo_url: photoUrl } : {}),
+        ...(hasBio ? { bio: bioValue ?? null } : {}),
         auth_email: authEmail,
         updated_at: new Date().toISOString(),
       },
@@ -90,6 +121,7 @@ export async function PATCH(request: Request) {
       ok: true,
       ...(hasDisplayName ? { displayName: rawName } : {}),
       ...(hasPhotoUrl ? { photoUrl } : {}),
+      ...(hasBio ? { bio: bioValue ?? "" } : {}),
     });
   } catch (e) {
     console.error(e);
@@ -107,7 +139,7 @@ export async function GET(request: Request) {
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase
       .from("dopamine_user_profiles")
-      .select("uid, display_name, photo_url, suspended_until")
+      .select("uid, display_name, photo_url, bio, suspended_until")
       .eq("uid", uid)
       .maybeSingle();
     if (error) {
@@ -123,6 +155,7 @@ export async function GET(request: Request) {
     const rowUid = typeof data.uid === "string" && data.uid.length > 0 ? data.uid : uid;
     const displayName = ((data.display_name as string | null) ?? "").trim();
     const photoUrl = (data.photo_url as string | null)?.trim() || null;
+    const bioRaw = (data.bio as string | null | undefined)?.trim() ?? "";
     const suspendedUntilRaw =
       (data.suspended_until as string | null | undefined) ?? null;
     return jsonWithCors({
@@ -130,6 +163,7 @@ export async function GET(request: Request) {
         uid: rowUid,
         displayName,
         photoUrl,
+        bio: bioRaw.length > 0 ? bioRaw : null,
         suspendedUntil: suspendedUntilRaw,
       },
     });

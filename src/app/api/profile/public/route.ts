@@ -21,7 +21,7 @@ export async function GET(request: Request) {
     ] = await Promise.all([
       supabase
         .from("dopamine_user_profiles")
-        .select("display_name, photo_url")
+        .select("display_name, photo_url, bio")
         .eq("uid", targetUid)
         .maybeSingle(),
       supabase
@@ -72,10 +72,12 @@ export async function GET(request: Request) {
     }
 
     const rawDn = (prof?.display_name as string | null)?.trim();
+    const rawBio = (prof?.bio as string | null | undefined)?.trim() ?? "";
     return jsonWithCors({
       uid: targetUid,
       displayName: rawDn && rawDn.length > 0 ? rawDn : null,
       photoUrl,
+      bio: rawBio.length > 0 ? rawBio : null,
       postsCount: postsCount ?? 0,
       followingCount: followingCount ?? 0,
       followersCount: followersCount ?? 0,

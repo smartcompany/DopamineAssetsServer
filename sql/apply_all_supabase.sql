@@ -83,6 +83,9 @@ alter table public.dopamine_user_profiles enable row level security;
 alter table public.dopamine_user_profiles
   add column if not exists suspended_until timestamptz;
 
+alter table public.dopamine_user_profiles
+  add column if not exists bio text;
+
 comment on column public.dopamine_user_profiles.suspended_until is
   '비NULL && 미래 시각이면 커뮤니티 글/댓글 작성 제한(관리자 사용정지).';
 
