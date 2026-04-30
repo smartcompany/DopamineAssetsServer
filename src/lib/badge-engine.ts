@@ -14,18 +14,18 @@ export type BadgeCatalogItem = {
 export const BADGE_CATALOG_VERSION = 1;
 
 export const BADGE_CATALOG: BadgeCatalogItem[] = [
-  { key: "first", label: "첫걸음", imageUrl: "/badges/badge_first.jpg" },
-  { key: "explorer", label: "커뮤니티 탐험가", imageUrl: "/badges/badge_explorer.jpg" },
-  { key: "write_first", label: "첫 작성자", imageUrl: "/badges/badge_write_first.jpg" },
-  { key: "comment_first", label: "첫 댓글러", imageUrl: "/badges/badge_comment_first.jpg" },
-  { key: "radar_on", label: "레이더 ON", imageUrl: "/badges/badge_rader_on.jpg" },
-  { key: "scan_assets", label: "스캐너", imageUrl: "/badges/badge_scan_assets.jpg" },
-  { key: "talk_king", label: "토론가", imageUrl: "/badges/badge_talk_king.jpg" },
-  { key: "heart_king", label: "공감왕", imageUrl: "/badges/badge_hart_king.jpg" },
-  { key: "visit_7", label: "연속 7일", imageUrl: "/badges/badge_visit_7.jpg" },
-  { key: "level_5", label: "레벨 5", imageUrl: "/badges/badge_5_level.jpg" },
-  { key: "level_10", label: "레벨 10", imageUrl: "/badges/badge_level_10.jpg" },
-  { key: "multi_market", label: "멀티마켓", imageUrl: "/badges/badge_multi_market.jpg" },
+  { key: "first", label: "첫걸음", imageUrl: "/badges/badge_first.png" },
+  { key: "explorer", label: "커뮤니티 탐험가", imageUrl: "/badges/badge_explorer.png" },
+  { key: "write_first", label: "첫 작성자", imageUrl: "/badges/badge_write_first.png" },
+  { key: "comment_first", label: "첫 댓글러", imageUrl: "/badges/badge_comment_first.png" },
+  { key: "radar_on", label: "레이더 ON", imageUrl: "/badges/badge_rader_on.png" },
+  { key: "scan_assets", label: "스캐너", imageUrl: "/badges/badge_scan_assets.png" },
+  { key: "talk_king", label: "토론가", imageUrl: "/badges/badge_talk_king.png" },
+  { key: "heart_king", label: "공감왕", imageUrl: "/badges/badge_hart_king.png" },
+  { key: "visit_7", label: "연속 7일", imageUrl: "/badges/badge_visit_7.png" },
+  { key: "level_5", label: "레벨 5", imageUrl: "/badges/badge_5_level.png" },
+  { key: "level_10", label: "레벨 10", imageUrl: "/badges/badge_level_10.png" },
+  { key: "multi_market", label: "멀티마켓", imageUrl: "/badges/badge_multi_market.png" },
 ];
 
 function toSet(keys: string[]) {
