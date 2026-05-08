@@ -5,7 +5,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY ?? "",
 });
 
-const EXPECTED_COUNT = 50;
+const EXPECTED_COUNT = 30;
 
 export type InterestAssetCategory =
   | "us_stock"
@@ -179,14 +179,14 @@ category 값은 반드시 다음 중 하나만 사용하세요 (영문 소문자
 }
 
 규칙:
-- 반드시 50개 자산을 포함할 것
-- rank는 1부터 50까지 정수, 중복 없이 score 내림차순과 일치할 것
+- 반드시 30개 자산을 포함할 것
+- rank는 1부터 30까지 정수, 중복 없이 score 내림차순과 일치할 것
 - score는 0~100 사이 값
 - 설명 없이 JSON 객체만 한 번 출력할 것`;
 }
 
 /**
- * OpenAI로 관심 자산 TOP 50 생성. 검증 실패 시 예외.
+ * OpenAI로 관심 자산 TOP 30 생성. 검증 실패 시 예외.
  */
 export async function fetchInterestAssetsFromOpenAI(): Promise<InterestAssetsPayload> {
   const apiKey = process.env.OPENAI_API_KEY?.trim();

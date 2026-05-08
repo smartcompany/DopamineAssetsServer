@@ -22,7 +22,7 @@ function cacheTtlMs(): number {
 }
 
 /**
- * OpenAI로 생성한 "오늘 관심 자산 TOP 50" (추정 점수).
+ * OpenAI로 생성한 "오늘 관심 자산 TOP 30" (추정 점수).
  * GET ?refresh=1 로 캐시 무시(운영/디버그용).
  */
 export async function GET(request: Request) {

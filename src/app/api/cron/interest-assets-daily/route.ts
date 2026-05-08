@@ -4,10 +4,12 @@ import { fetchInterestAssetsFromOpenAI } from "@/lib/interest-assets-openai";
 import { persistInterestAssetsPayloadToSupabase } from "@/lib/interest-assets-supabase-sync";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
-export const maxDuration = 120;
+// OpenAI(reasoning model) 응답이 가끔 60~90s 걸릴 수 있어 여유를 둔다.
+// Vercel Pro 기준 최대 300s. (Hobby 플랜이면 60으로 제한됨)
+export const maxDuration = 300;
 
 /**
- * 일 1회: OpenAI 관심 TOP50 생성 → Supabase `dopamine_interest_asset_scores` 병합.
+ * 일 1회: OpenAI 관심 TOP30 생성 → Supabase `dopamine_interest_asset_scores` 병합.
  * GitHub `daily-event.yml` 에서 `CRON_SECRET` Bearer 로 호출.
  */
 export async function POST(request: Request) {

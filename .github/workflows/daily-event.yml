@@ -1,6 +1,6 @@
 # 한국 장 마감 후 일일 작업 (10:00 KST = 01:00 UTC)
 # - 시장 요약 푸시: POST /api/cron/market-daily-push
-# - 관심 자산 TOP50 OpenAI → Supabase: POST /api/cron/interest-assets-daily
+# - 관심 자산 TOP30 OpenAI → Supabase: POST /api/cron/interest-assets-daily
 name: Daily events (10:00 KST)
 
 on:
