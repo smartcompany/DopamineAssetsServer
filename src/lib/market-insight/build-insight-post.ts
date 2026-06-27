@@ -204,7 +204,6 @@ async function callOpenAI(candidates: CoinpangPost[]): Promise<ModelPick | null>
       },
       { role: "user", content: prompt },
     ],
-    response_format: { type: "json_object" },
   });
   const raw = completion.choices[0]?.message?.content?.trim() ?? "";
   if (!raw) return null;

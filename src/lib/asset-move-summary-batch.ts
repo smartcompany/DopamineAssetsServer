@@ -1,7 +1,4 @@
-import {
-  OPENAI_CHAT_COMPLETIONS_URL,
-  resolveOpenAIModel,
-} from "nextjs-share-lib";
+import { ai } from "./ai-client";
 import { MOVE_SUMMARY_SYSTEM_PROMPT } from "./asset-move-summary-prompts";
 import { getSupabaseAdmin } from "./supabase-admin";
 import type { AssetClass, RankedAssetDto } from "./types";
@@ -40,11 +37,9 @@ function chunk<T>(arr: T[], size: number): T[][] {
 async function callOpenAiForBatch(
   assets: RankedAssetDto[],
 ): Promise<LlmItem[]> {
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
-  if (!apiKey) {
+  if (!process.env.OPENAI_API_KEY?.trim()) {
     throw new Error("OPENAI_API_KEY is not set");
   }
-  const model = resolveOpenAIModel();
 
   const payload = assets.map((a) => ({
     symbol: a.symbol,
@@ -54,35 +49,18 @@ async function callOpenAiForBatch(
     volumeChangePct: a.volumeChangePct,
   }));
 
-  const res = await fetch(OPENAI_CHAT_COMPLETIONS_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      max_completion_tokens: 1200,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: MOVE_SUMMARY_SYSTEM_PROMPT },
-        {
-          role: "user",
-          content: JSON.stringify({ assets: payload }),
-        },
-      ],
-    }),
+  const response = await ai.createChatCompletion({
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: MOVE_SUMMARY_SYSTEM_PROMPT },
+      {
+        role: "user",
+        content: JSON.stringify({ assets: payload }),
+      },
+    ],
   });
 
-  if (!res.ok) {
-    const t = await res.text();
-    throw new Error(`OpenAI HTTP ${res.status}: ${t.slice(0, 400)}`);
-  }
-
-  const data = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  const raw = data.choices?.[0]?.message?.content?.trim();
+  const raw = response.choices?.[0]?.message?.content?.trim();
   if (!raw) throw new Error("OpenAI empty content");
 
   let parsed: unknown;
@@ -159,7 +137,7 @@ export async function runAssetMoveSummaryJob(): Promise<MoveSummaryJobResult> {
   const supabase = getSupabaseAdmin();
   const batchSize = Number.isFinite(BATCH_SIZE) && BATCH_SIZE > 0 ? BATCH_SIZE : 8;
   const batches = chunk(merged, batchSize);
-  const model = resolveOpenAIModel();
+  const model = "gpt-5-mini";
   const batchRunAt = new Date().toISOString();
   let rowsUpserted = 0;
 

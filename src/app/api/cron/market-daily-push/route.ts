@@ -1,7 +1,4 @@
-import {
-  OPENAI_CHAT_COMPLETIONS_URL,
-  resolveOpenAIModel,
-} from "nextjs-share-lib";
+import { ai } from "@/lib/ai-client";
 import { buildYahooMarketBrief } from "@/lib/yahoo-market-brief";
 import { jsonWithCors } from "@/lib/cors";
 import { FEED_CACHE_ID } from "@/lib/feed-cache-constants";
@@ -122,65 +119,48 @@ async function buildMarketSummaryEnFromFeedCache(): Promise<{
       })),
     ),
   );
-  const res = await fetch(OPENAI_CHAT_COMPLETIONS_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: resolveOpenAIModel(),
-      max_completion_tokens: 600,
-      reasoning_effort: "minimal",
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content:
-            "당신은 글로벌 시장 분석가이자 똑똑한 마켓 라이터입니다. 사실에 기반하지만, 일반 독자가 끝까지 읽고 싶도록 흥미롭고 또렷한 영어 시장 요약을 작성합니다.",
-        },
-        {
-          role: "user",
-          content: JSON.stringify({
-            instruction:
-              "아래 snapshots(자산군별 상승·하락 상위 종목)를 바탕으로 오늘의 시장 요약을 영어로 작성하세요. 단조로운 사실 나열이 아니라, 관심을 끌면서도 정확한 마켓 코멘터리를 목표로 합니다.",
-            tone: [
-              "후킹은 강하게, 표현은 절제. 첫 문장은 오늘 시장의 캐릭터(예: 위험 선호 회복, 차익실현, 양극화 등)를 또렷하게 짚어 독자가 계속 읽고 싶게 만든다.",
-              "스마트하고 자신감 있는 어투. 친근하되 가벼워 보이지 않게.",
-              "비유는 1번까지 허용하되 짧고 자연스러운 표현만. '로켓', '폭죽', '색종이 조각' 같은 과장된 비유·이모지·감탄사·뻔한 광고체는 금지.",
-            ],
-            structure: [
-              "분량: 3~4개의 짧은 문장, 합쳐서 약 360자 이내.",
-              "1문장: 오늘의 시장 캐릭터 한 줄 — 매크로 분위기 또는 흐름 요약.",
-              "2~3문장: 가장 눈에 띄는 지역/자산군 1~2개를 골라, 대표 종목 1~2개를 이름과 변동률(%)로 구체적으로 짚어준다.",
-              "마지막 문장(선택): 암호화폐·원자재의 두드러진 흐름이나, 다음 관전 포인트 한 줄로 마무리.",
-            ],
-            naming_rules: [
-              "종목은 항상 사람이 읽기 쉬운 '이름'으로 부른다. 예: 'POSCO Future M', 'Bitcoin', 'Crude Oil'.",
-              "필요 시 이름 뒤 괄호로 티커를 덧붙일 수 있다. 예: 'POSCO Future M (003670.KS) +12%'.",
-              "'011790.KS', '7162.T' 같이 티커만 단독으로 쓰는 것은 금지. 항상 이름과 함께 표기한다.",
-              "snapshots에 들어 있는 이름·티커만 사용한다. 새로 만들어 넣지 않는다.",
-            ],
-            format: [
-              "결과는 한 단락의 영어 평문(plain text).",
-              "글머리 기호·마크다운·헤더·이모지 금지.",
-            ],
-            output_format:
-              '{"summaryEn":"string (English, plain text)"}',
-            snapshots: blocks,
-          }),
-        },
-      ],
-    }),
+  const response = await ai.createChatCompletion({
+    response_format: { type: "json_object" },
+    messages: [
+      {
+        role: "system",
+        content:
+          "당신은 글로벌 시장 분석가이자 똑똑한 마켓 라이터입니다. 사실에 기반하지만, 일반 독자가 끝까지 읽고 싶도록 흥미롭고 또렷한 영어 시장 요약을 작성합니다.",
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          instruction:
+            "아래 snapshots(자산군별 상승·하락 상위 종목)를 바탕으로 오늘의 시장 요약을 영어로 작성하세요. 단조로운 사실 나열이 아니라, 관심을 끌면서도 정확한 마켓 코멘터리를 목표로 합니다.",
+          tone: [
+            "후킹은 강하게, 표현은 절제. 첫 문장은 오늘 시장의 캐릭터(예: 위험 선호 회복, 차익실현, 양극화 등)를 또렷하게 짚어 독자가 계속 읽고 싶게 만든다.",
+            "스마트하고 자신감 있는 어투. 친근하되 가벼워 보이지 않게.",
+            "비유는 1번까지 허용하되 짧고 자연스러운 표현만. '로켓', '폭죽', '색종이 조각' 같은 과장된 비유·이모지·감탄사·뻔한 광고체는 금지.",
+          ],
+          structure: [
+            "분량: 3~4개의 짧은 문장, 합쳐서 약 360자 이내.",
+            "1문장: 오늘의 시장 캐릭터 한 줄 — 매크로 분위기 또는 흐름 요약.",
+            "2~3문장: 가장 눈에 띄는 지역/자산군 1~2개를 골라, 대표 종목 1~2개를 이름과 변동률(%)로 구체적으로 짚어준다.",
+            "마지막 문장(선택): 암호화폐·원자재의 두드러진 흐름이나, 다음 관전 포인트 한 줄로 마무리.",
+          ],
+          naming_rules: [
+            "종목은 항상 사람이 읽기 쉬운 '이름'으로 부른다. 예: 'POSCO Future M', 'Bitcoin', 'Crude Oil'.",
+            "필요 시 이름 뒤 괄호로 티커를 덧붙일 수 있다. 예: 'POSCO Future M (003670.KS) +12%'.",
+            "'011790.KS', '7162.T' 같이 티커만 단독으로 쓰는 것은 금지. 항상 이름과 함께 표기한다.",
+            "snapshots에 들어 있는 이름·티커만 사용한다. 새로 만들어 넣지 않는다.",
+          ],
+          format: [
+            "결과는 한 단락의 영어 평문(plain text).",
+            "글머리 기호·마크다운·헤더·이모지 금지.",
+          ],
+          output_format:
+            '{"summaryEn":"string (English, plain text)"}',
+          snapshots: blocks,
+        }),
+      },
+    ],
   });
-  if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    throw new Error(`OpenAI market_summary HTTP ${res.status}: ${t.slice(0, 300)}`);
-  }
-  const data = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  const raw = data.choices?.[0]?.message?.content?.trim();
+  const raw = response.choices?.[0]?.message?.content?.trim();
   if (!raw) return null;
   let parsed: unknown;
   try {

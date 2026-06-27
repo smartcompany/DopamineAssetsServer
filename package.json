@@ -15,7 +15,7 @@
     "iconv-lite": "^0.7.2",
     "jsonwebtoken": "^9.0.3",
     "next": "16.2.1",
-    "nextjs-share-lib": "github:smartcompany/nextjs_share_lib#v0.1.0",
+    "nextjs-share-lib": "github:smartcompany/nextjs_share_lib#main",
     "openai": "^6.33.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
