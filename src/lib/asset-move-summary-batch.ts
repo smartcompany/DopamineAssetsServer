@@ -1,3 +1,7 @@
+import {
+  OPENAI_CHAT_COMPLETIONS_URL,
+  resolveOpenAIModel,
+} from "nextjs-share-lib";
 import { MOVE_SUMMARY_SYSTEM_PROMPT } from "./asset-move-summary-prompts";
 import { getSupabaseAdmin } from "./supabase-admin";
 import type { AssetClass, RankedAssetDto } from "./types";
@@ -5,10 +9,6 @@ import { getFeedRankings } from "./feed-rankings-service";
 
 const BATCH_SIZE = Number.parseInt(process.env.MOVE_SUMMARY_BATCH_SIZE ?? "8", 10);
 const RANK_LIMIT = Number.parseInt(process.env.MOVE_SUMMARY_RANK_LIMIT ?? "15", 10);
-
-/** USDTSignal `analyze-strategy-cron` 과 동일: Chat Completions + gpt-5-mini 기본값 */
-const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
-const DEFAULT_OPENAI_MODEL = "gpt-5-mini";
 
 type LlmItem = {
   symbol: string;
@@ -44,7 +44,7 @@ async function callOpenAiForBatch(
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY is not set");
   }
-  const model = DEFAULT_OPENAI_MODEL;
+  const model = resolveOpenAIModel();
 
   const payload = assets.map((a) => ({
     symbol: a.symbol,
@@ -159,7 +159,7 @@ export async function runAssetMoveSummaryJob(): Promise<MoveSummaryJobResult> {
   const supabase = getSupabaseAdmin();
   const batchSize = Number.isFinite(BATCH_SIZE) && BATCH_SIZE > 0 ? BATCH_SIZE : 8;
   const batches = chunk(merged, batchSize);
-  const model = DEFAULT_OPENAI_MODEL;
+  const model = resolveOpenAIModel();
   const batchRunAt = new Date().toISOString();
   let rowsUpserted = 0;
 

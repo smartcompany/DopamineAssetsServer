@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { openAIChatConfig } from "@/lib/openai-config";
+import { openAIChatConfig } from "nextjs-share-lib";
 
 // ────────────────────────────────────────────────────────────────────────────
 // X `x-daily-post` cron의 "인사이트 모드" 본문 빌더.

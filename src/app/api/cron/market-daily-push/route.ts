@@ -1,3 +1,7 @@
+import {
+  OPENAI_CHAT_COMPLETIONS_URL,
+  resolveOpenAIModel,
+} from "nextjs-share-lib";
 import { buildYahooMarketBrief } from "@/lib/yahoo-market-brief";
 import { jsonWithCors } from "@/lib/cors";
 import { FEED_CACHE_ID } from "@/lib/feed-cache-constants";
@@ -42,9 +46,6 @@ function fmtPct(p: number): string {
   const sign = v > 0 ? "+" : "";
   return `${sign}${v.toFixed(1)}%`;
 }
-
-const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
-const OPENAI_MODEL = "gpt-5-mini";
 
 type MoverInput = { symbol: string; name?: string; priceChangePct: number };
 type MoverEntry = { name: string; symbol: string; changePct: string };
@@ -128,7 +129,7 @@ async function buildMarketSummaryEnFromFeedCache(): Promise<{
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: OPENAI_MODEL,
+      model: resolveOpenAIModel(),
       max_completion_tokens: 600,
       reasoning_effort: "minimal",
       response_format: { type: "json_object" },

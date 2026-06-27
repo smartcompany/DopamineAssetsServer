@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { jsonWithCors } from "@/lib/cors";
-import { openAIChatConfig } from "@/lib/openai-config";
+import { openAIChatConfig } from "nextjs-share-lib";
 import {
   buildCacheKey,
   canonicalizeNewsUrls,

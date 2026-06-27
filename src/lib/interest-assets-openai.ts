@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { openAIChatConfig } from "@/lib/openai-config";
+import { openAIChatConfig } from "nextjs-share-lib";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY ?? "",
