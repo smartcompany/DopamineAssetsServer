@@ -1,6 +1,5 @@
-import OpenAI from "openai";
 import { jsonWithCors } from "@/lib/cors";
-import { openAIChatConfig } from "nextjs-share-lib";
+import { ai } from "@/lib/ai-client";
 import {
   buildCacheKey,
   canonicalizeNewsUrls,
@@ -8,10 +7,6 @@ import {
   saveCachedNewsAiSummary,
 } from "@/lib/news-ai-summary-cache";
 import { fetchArticleExcerptsForNewsAi } from "@/lib/news-ai-article-excerpt";
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY ?? "",
-});
 
 const SHA256_HEX = /^[a-f0-9]{64}$/i;
 
@@ -139,8 +134,7 @@ ${toneBlock}
 [기사별 제목 · 본문 발췌(앞부분)]
 ${articleBlock}`;
 
-    const completion = await openai.chat.completions.create({
-      model: openAIChatConfig.model,
+    const completion = await ai.createChatCompletion({
       messages: [{ role: "user", content: prompt }],
     });
 

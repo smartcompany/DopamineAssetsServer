@@ -1,9 +1,4 @@
-import OpenAI from "openai";
-import { openAIChatConfig } from "nextjs-share-lib";
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY ?? "",
-});
+import { ai } from "@/lib/ai-client";
 
 /** hide_post: 글을 삭제하지 않고 숨김(차단) 플래그 적용 */
 export type CommentReportVerdict = "hide_post" | "needs_review" | "no_issue";
@@ -54,9 +49,7 @@ needs_review
 신고 대상 본문: ${content || "(없음)"}
 신고 사유·내용: ${reportReason}`;
 
-  const response = await openai.chat.completions.create({
-    model: openAIChatConfig.model,
-    max_completion_tokens: openAIChatConfig.max_completion_tokens,
+  const response = await ai.createChatCompletion({
     messages: [{ role: "user", content: prompt }],
   });
 

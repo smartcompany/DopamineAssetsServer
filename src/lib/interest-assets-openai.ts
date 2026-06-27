@@ -1,9 +1,4 @@
-import OpenAI from "openai";
-import { openAIChatConfig } from "nextjs-share-lib";
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY ?? "",
-});
+import { ai } from "@/lib/ai-client";
 
 const EXPECTED_COUNT = 30;
 
@@ -196,9 +191,8 @@ export async function fetchInterestAssetsFromOpenAI(): Promise<InterestAssetsPay
 
   const utcDateLabel = new Date().toISOString().slice(0, 10);
 
-  const completion = await openai.chat.completions.create({
-    model: openAIChatConfig.model,
-    max_completion_tokens: 14_000,
+  const completion = await ai.createChatCompletion({
+    preset: "long_output",
     messages: [
       {
         role: "system",

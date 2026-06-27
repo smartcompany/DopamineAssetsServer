@@ -1,5 +1,4 @@
-import OpenAI from "openai";
-import { openAIChatConfig } from "nextjs-share-lib";
+import { ai } from "@/lib/ai-client";
 
 // ────────────────────────────────────────────────────────────────────────────
 // X `x-daily-post` cron의 "인사이트 모드" 본문 빌더.
@@ -33,8 +32,6 @@ const MAX_KOREAN_CHARS = 110;
 // 셔플은 매 실행 시 다른 글이 뽑히도록 하기 위함(하루 여러 번 실행되는 cron에서 중복 방지).
 const FETCH_LIMIT = 20;
 const CANDIDATE_COUNT = 5;
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY ?? "" });
 
 // ────────────────────────────────────────────────────────────────────────────
 // Config 로더
@@ -197,9 +194,8 @@ function parsePick(raw: string): ModelPick | null {
 
 async function callOpenAI(candidates: CoinpangPost[]): Promise<ModelPick | null> {
   const prompt = buildPrompt(candidates);
-  const completion = await openai.chat.completions.create({
-    model: openAIChatConfig.model,
-    max_completion_tokens: openAIChatConfig.max_completion_tokens,
+  const completion = await ai.createChatCompletion({
+    response_format: { type: "json_object" },
     messages: [
       {
         role: "system",
