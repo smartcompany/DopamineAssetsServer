@@ -137,7 +137,6 @@ export async function runAssetMoveSummaryJob(): Promise<MoveSummaryJobResult> {
   const supabase = getSupabaseAdmin();
   const batchSize = Number.isFinite(BATCH_SIZE) && BATCH_SIZE > 0 ? BATCH_SIZE : 8;
   const batches = chunk(merged, batchSize);
-  const model = "gpt-5-mini";
   const batchRunAt = new Date().toISOString();
   let rowsUpserted = 0;
 
@@ -159,7 +158,6 @@ export async function runAssetMoveSummaryJob(): Promise<MoveSummaryJobResult> {
             asset_class: a.assetClass,
             summary_date: summaryDate,
             summary_ko: it.summary,
-            model,
             batch_run_at: batchRunAt,
           };
         })
