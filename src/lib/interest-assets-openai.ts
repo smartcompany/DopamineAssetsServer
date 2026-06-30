@@ -72,7 +72,7 @@ export function parseInterestAssetsResponse(raw: string): InterestAssetsPayload 
   if (typeof date !== "string" || !DATE_RE.test(date.trim())) return null;
 
   const assetsRaw = o.assets;
-  if (!Array.isArray(assetsRaw) || assetsRaw.length !== EXPECTED_COUNT) {
+  if (!Array.isArray(assetsRaw) || assetsRaw.length < EXPECTED_COUNT) {
     return null;
   }
 
@@ -111,7 +111,8 @@ export function parseInterestAssetsResponse(raw: string): InterestAssetsPayload 
   }
 
   rows.sort((a, b) => b.score - a.score);
-  const assets: InterestAssetItem[] = rows.map((row, i) => ({
+  const topRows = rows.slice(0, EXPECTED_COUNT);
+  const assets: InterestAssetItem[] = topRows.map((row, i) => ({
     ...row,
     rank: i + 1,
   }));
@@ -120,64 +121,31 @@ export function parseInterestAssetsResponse(raw: string): InterestAssetsPayload 
 }
 
 function buildUserPrompt(utcDateLabel: string): string {
-  return `당신은 금융 데이터 분석 AI입니다.
+  return `Generate the top ${EXPECTED_COUNT} most-trending assets in the last 24h across US stocks, KR stocks, commodities, crypto.
+Estimate a Google-Trends-style relative interest score 0..100 for each (100 = highest today).
 
-작업:
-최근 24시간 동안 시장에서 가장 주목받는 자산 TOP 50을 생성하세요.
-대상 자산은 다음을 포함합니다:
-- 미국 주식
-- 한국 주식
-- 원자재
-- 암호화폐
+Rules:
+- Reflect real market moves, news, investor interest. No fake tickers.
+- name: English (e.g. Bitcoin, Tesla, Samsung Electronics).
+- commodity.symbol: Yahoo futures tickers only (GC=F, SI=F, CL=F, PL=F, PA=F). Never FX/spot codes like XAUUSD. Never put gold/silver under crypto.
+- crypto.symbol: base symbol only (BTC, ETH, SOL). Never -USD suffix.
+- category ∈ { us_stock, kr_stock, commodity, crypto }.
+- date must equal "${utcDateLabel}".
+- Output ONE JSON object only — no markdown, no commentary.
 
-각 자산에 대해 Google Trends 기준 상대 관심 점수(0~100)를 추정하세요.
-(100은 오늘 기준 가장 높은 관심도를 의미합니다)
-
-요구사항:
-- 실제 시장 흐름, 뉴스, 투자자 관심도를 반영할 것
-- 최근 검색량이 높거나 뉴스 언급이 많은 자산을 우선 포함할 것
-- 모든 자산에 대해 일관된 기준으로 점수를 부여할 것
-- 임의로 만든 가짜 자산은 포함하지 말 것
-- name은 기본적으로 영어(영문) 자산명을 사용할 것 (예: Bitcoin, Tesla, Samsung Electronics)
-- 원자재(commodity) symbol은 반드시 Yahoo Finance 선물 티커만 쓸 것 (금 GC=F, 은 SI=F, 원유 CL=F, 백금 PL=F, 팔라듐 PA=F). FX 스팟·브로커 코드(XAUUSD, XAGUSD 등)는 절대 쓰지 말 것. 금·은을 crypto 카테고리로 넣지 말 것.
-- crypto symbol은 반드시 코인 베이스 심볼만 쓸 것 (예: BTC, ETH, SOL). BTC-USD 같은 -USD 접미사는 절대 쓰지 말 것.
-
-[출력의 date 필드]
-반드시 다음 날짜 문자열을 사용하세요 (그대로 복사): "${utcDateLabel}"
-
-category 값은 반드시 다음 중 하나만 사용하세요 (영문 소문자):
-- us_stock (미국 주식)
-- kr_stock (한국 주식)
-- commodity (원자재)
-- crypto (암호화폐)
-
-출력 형식 (반드시 JSON만 출력, 다른 텍스트·마크다운·코드펜스 금지):
-
+Schema:
 {
   "date": "${utcDateLabel}",
   "assets": [
-    {
-      "rank": 1,
-      "name": "Gold Futures",
-      "symbol": "GC=F",
-      "category": "commodity",
-      "score": 100
-    },
-    {
-      "rank": 2,
-      "name": "Tesla",
-      "symbol": "TSLA",
-      "category": "us_stock",
-      "score": 95
-    }
+    { "rank": 1, "name": "Gold Futures", "symbol": "GC=F", "category": "commodity", "score": 100 },
+    { "rank": 2, "name": "Tesla",         "symbol": "TSLA",  "category": "us_stock",  "score": 95  }
   ]
 }
 
-규칙:
-- 반드시 30개 자산을 포함할 것
-- rank는 1부터 30까지 정수, 중복 없이 score 내림차순과 일치할 것
-- score는 0~100 사이 값
-- 설명 없이 JSON 객체만 한 번 출력할 것`;
+Hard constraints:
+- exactly ${EXPECTED_COUNT} items
+- rank 1..${EXPECTED_COUNT} integers, unique, ordered by score desc
+- score in [0, 100]`;
 }
 
 /**
@@ -191,6 +159,7 @@ export async function fetchInterestAssetsFromOpenAI(): Promise<InterestAssetsPay
 
   const utcDateLabel = new Date().toISOString().slice(0, 10);
 
+  // long_output: reasoning_effort=minimal 로 gpt-5-mini 응답을 빠르게 유지.
   const completion = await ai.createChatCompletion({
     preset: "long_output",
     messages: [

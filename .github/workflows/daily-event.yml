@@ -37,8 +37,10 @@ jobs:
             echo "Missing CRON_API_BASE_URL or CRON_SECRET"
             exit 1
           fi
-          curl -sS -X POST "${CRON_API_BASE_URL}/api/cron/interest-assets-daily" \
+          RESPONSE=$(curl -sS -X POST "${CRON_API_BASE_URL}/api/cron/interest-assets-daily" \
             -H "Authorization: Bearer ${CRON_SECRET}" \
             -H "Content-Type: application/json" \
-            --fail
+            --max-time 300 \
+            --fail-with-body)
+          echo "interest-assets-daily response: ${RESPONSE}"
 
